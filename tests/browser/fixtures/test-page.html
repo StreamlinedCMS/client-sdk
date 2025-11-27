@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Streamlined CMS - Test Page</title>
+
+        <!-- Load the SDK -->
+        <script
+            src="/dist/streamlined-cms.js"
+            data-api-url="https://streamlined-cms-api-worker-staging.whi.workers.dev"
+            data-app-id="test-app"
+            data-log-level="none"
+            data-mock-auth="true"
+            data-mock-user-id="test-user"
+        ></script>
+
+        <style>
+            body {
+                font-family: sans-serif;
+                padding: 20px;
+            }
+            .test-section {
+                margin-bottom: 20px;
+                padding: 20px;
+                border: 1px solid #ddd;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="test-section">
+            <h1 data-editable="test-title">Test Title</h1>
+            <p data-editable="test-paragraph">Test paragraph content.</p>
+        </div>
+
+        <div class="test-section">
+            <h2 data-editable="test-heading">Test Heading</h2>
+            <p data-editable="test-content">More test content here.</p>
+        </div>
+    </body>
+</html>

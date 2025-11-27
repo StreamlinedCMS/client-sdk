@@ -1,4 +1,9 @@
 /**
+ * Log level options
+ */
+export type LogLevel = 'none' | 'error' | 'warn' | 'info' | 'debug';
+
+/**
  * Configuration options for StreamlinedCMS
  */
 export interface StreamlinedCMSConfig {
@@ -13,9 +18,10 @@ export interface StreamlinedCMSConfig {
     appId: string;
 
     /**
-     * Enable debug logging
+     * Logging level: 'none' | 'error' | 'warn' | 'info' | 'debug'
+     * Defaults to 'error'
      */
-    debug?: boolean;
+    logLevel?: LogLevel;
 
     /**
      * Mock authentication (for development)

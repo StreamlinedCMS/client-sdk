@@ -4,7 +4,7 @@
  */
 
 import { StreamlinedCMS } from "./sdk.js";
-import type { StreamlinedCMSConfig } from "./types.js";
+import type { StreamlinedCMSConfig, LogLevel } from "./types.js";
 
 /**
  * Inject hiding styles immediately to prevent FOUC
@@ -55,10 +55,9 @@ function getConfigFromScriptTag(): Partial<StreamlinedCMSConfig> {
         return {};
     }
 
-    return {
+    const config: Partial<StreamlinedCMSConfig> = {
         apiUrl: scriptTag.dataset.apiUrl,
         appId: scriptTag.dataset.appId,
-        debug: scriptTag.dataset.debug === "true",
         mockAuth:
             scriptTag.dataset.mockAuth === "true"
                 ? {
@@ -67,6 +66,14 @@ function getConfigFromScriptTag(): Partial<StreamlinedCMSConfig> {
                   }
                 : undefined,
     };
+
+    // Support logLevel attribute (data-log-level becomes dataset.logLevel)
+    const logLevelAttr = scriptTag.dataset.logLevel;
+    if (logLevelAttr && ["none", "error", "warn", "info", "debug"].includes(logLevelAttr)) {
+        config.logLevel = logLevelAttr as LogLevel;
+    }
+
+    return config;
 }
 
 /**
@@ -87,7 +94,7 @@ function autoInit(): void {
     const sdkConfig: StreamlinedCMSConfig = {
         apiUrl,
         appId: config.appId,
-        debug: config.debug || false,
+        logLevel: config.logLevel,
         mockAuth: config.mockAuth,
     };
 
