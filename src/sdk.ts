@@ -15,8 +15,12 @@ export class StreamlinedCMS {
     constructor(config: StreamlinedCMSConfig) {
         this.config = config;
 
-        // Set log level (defaults to 'error')
-        this.logLevel = config.logLevel || "error";
+        // Normalize log level (false/null become 'none', undefined becomes 'error')
+        if (config.logLevel === false || config.logLevel === null) {
+            this.logLevel = "none";
+        } else {
+            this.logLevel = config.logLevel || "error";
+        }
 
         this.logDebug("StreamlinedCMS initialized", this.config);
 

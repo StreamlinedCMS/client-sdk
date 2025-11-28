@@ -12,7 +12,7 @@ describe("StreamlinedCMS", () => {
         config = {
             apiUrl: "http://localhost:8787",
             appId: "test-app",
-            debug: false,
+            logLevel: "none",
             mockAuth: {
                 enabled: true,
                 userId: "test-user",
@@ -156,6 +156,88 @@ describe("StreamlinedCMS", () => {
             const saveButton = document.getElementById("streamlined-save-btn");
             expect(saveButton).toBeDefined();
             expect(saveButton?.textContent).toBe("Save Changes");
+        });
+    });
+
+    describe("log level", () => {
+        it("should return configured log level", () => {
+            const cms = new StreamlinedCMS({ ...config, logLevel: "debug" });
+            expect(cms.getLogLevel()).toBe("debug");
+        });
+
+        it("should default to error log level", () => {
+            const { logLevel, ...configWithoutLogLevel } = config;
+            const cms = new StreamlinedCMS(configWithoutLogLevel);
+            expect(cms.getLogLevel()).toBe("error");
+        });
+
+        it("should normalize false to none", () => {
+            const cms = new StreamlinedCMS({ ...config, logLevel: false });
+            expect(cms.getLogLevel()).toBe("none");
+        });
+
+        it("should normalize null to none", () => {
+            const cms = new StreamlinedCMS({ ...config, logLevel: null });
+            expect(cms.getLogLevel()).toBe("none");
+        });
+
+        it("should support all log levels", () => {
+            const levels = ["none", "error", "warn", "info", "debug"] as const;
+
+            levels.forEach((level) => {
+                const cms = new StreamlinedCMS({ ...config, logLevel: level });
+                expect(cms.getLogLevel()).toBe(level);
+            });
+        });
+
+        it("should log debug messages when debug level set", async () => {
+            const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+            document.body.innerHTML = '<div data-editable="test">Test</div>';
+
+            const cms = new StreamlinedCMS({ ...config, logLevel: "debug" });
+
+            global.fetch = vi.fn().mockResolvedValue({
+                ok: false,
+                status: 404,
+            });
+
+            await cms.init();
+
+            expect(consoleSpy).toHaveBeenCalled();
+            expect(consoleSpy).toHaveBeenCalledWith(
+                expect.stringContaining("[StreamlinedCMS]"),
+                expect.anything()
+            );
+
+            consoleSpy.mockRestore();
+        });
+
+        it("should not log when log level is none", async () => {
+            const consoleLogSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+            const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+            const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+            document.body.innerHTML = '<div data-editable="test">Test</div>';
+
+            const cms = new StreamlinedCMS({ ...config, logLevel: "none" });
+
+            global.fetch = vi.fn().mockResolvedValue({
+                ok: false,
+                status: 404,
+            });
+
+            await cms.init();
+
+            // With logLevel 'none', no logs should appear
+            const streamlinedLogs = consoleLogSpy.mock.calls.filter(
+                (call) => call[0]?.toString().includes("[StreamlinedCMS]")
+            );
+            expect(streamlinedLogs.length).toBe(0);
+
+            consoleLogSpy.mockRestore();
+            consoleWarnSpy.mockRestore();
+            consoleErrorSpy.mockRestore();
         });
     });
 

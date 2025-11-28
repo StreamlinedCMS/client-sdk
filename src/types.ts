@@ -1,7 +1,13 @@
 /**
  * Log level options
+ * Internal type uses string values for the severity hierarchy
  */
 export type LogLevel = 'none' | 'error' | 'warn' | 'info' | 'debug';
+
+/**
+ * Log level input options (accepts false/null which normalize to 'none')
+ */
+export type LogLevelInput = LogLevel | false | null;
 
 /**
  * Configuration options for StreamlinedCMS
@@ -18,10 +24,10 @@ export interface StreamlinedCMSConfig {
     appId: string;
 
     /**
-     * Logging level: 'none' | 'error' | 'warn' | 'info' | 'debug'
-     * Defaults to 'error'
+     * Logging level: 'none' | 'error' | 'warn' | 'info' | 'debug' | false | null
+     * Defaults to 'error'. Use false/null or 'none' to disable all logging.
      */
-    logLevel?: LogLevel;
+    logLevel?: LogLevelInput;
 
     /**
      * Mock authentication (for development)
