@@ -88,7 +88,24 @@
         contentData.forEach((item) => {
             const element = elements.get(item.elementId);
             if (element) {
-                element.innerHTML = item.content;
+                // Check if this is an image element (by tag or explicit type attribute)
+                const isImage =
+                    element.tagName === "IMG" ||
+                    element.getAttribute("data-editable-type") === "image";
+                if (isImage && element instanceof HTMLImageElement) {
+                    // Create new image and swap immediately to avoid placeholder flash
+                    const newImg = document.createElement("img");
+                    // Copy all attributes from original
+                    for (let i = 0; i < element.attributes.length; i++) {
+                        const attr = element.attributes[i];
+                        newImg.setAttribute(attr.name, attr.value);
+                    }
+                    newImg.src = item.content;
+                    element.replaceWith(newImg);
+                    elements.set(item.elementId, newImg);
+                } else {
+                    element.innerHTML = item.content;
+                }
             }
         });
     }

@@ -3,8 +3,10 @@
  */
 
 import { Logger } from "loganite";
-import { Auth, type EditorMode } from "./auth.js";
+import { Auth, type EditorMode, type MediaFile } from "./auth.js";
 import type { StreamlinedCMSConfig, ContentElement } from "./types.js";
+
+export type { MediaFile };
 
 export class StreamlinedCMS {
     private config: StreamlinedCMSConfig;
@@ -660,7 +662,22 @@ export class StreamlinedCMS {
     }
 
     /**
-     * Clean up SDK resources (auth bridge, event listeners, etc.)
+     * Open media manager popup for file selection
+     * Returns selected file on success, null if user cancels or closes popup
+     */
+    public async openMediaManager(): Promise<MediaFile | null> {
+        this.log.debug("Opening media manager popup");
+        const file = await this.auth.openMediaManager();
+        if (file) {
+            this.log.debug("Media file selected", { fileId: file.fileId, filename: file.filename });
+        } else {
+            this.log.debug("Media manager closed without selection");
+        }
+        return file;
+    }
+
+    /**
+     * Clean up SDK resources
      */
     public destroy(): void {
         this.log.debug("Destroying SDK instance");

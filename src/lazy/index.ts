@@ -10,7 +10,7 @@
  */
 
 import { Logger } from "loganite";
-import { Auth, type EditorMode } from "../auth.js";
+import { Auth, type EditorMode, type MediaFile } from "../auth.js";
 import { getConfigFromScriptTag, type ViewerConfig } from "../viewer/config.js";
 
 // Import Lit components to register them
@@ -24,6 +24,8 @@ import type { HtmlEditorModal } from "../components/html-editor-modal.js";
 const TOOLBAR_HEIGHT_DESKTOP = 48;
 const TOOLBAR_HEIGHT_MOBILE = 56;
 
+type EditableType = "text" | "image";
+
 class EditorController {
     private config: ViewerConfig;
     private log: Logger;
@@ -31,6 +33,7 @@ class EditorController {
     private apiKey: string | null = null;
     private currentMode: EditorMode = "viewer";
     private editableElements: Map<string, HTMLElement> = new Map();
+    private editableTypes: Map<string, EditableType> = new Map();
     private originalContent: Map<string, string> = new Map();
     private editingElementId: string | null = null;
     private customSignInTrigger: Element | null = null;
@@ -84,8 +87,19 @@ class EditorController {
             const elementId = element.getAttribute("data-editable");
             if (elementId) {
                 this.editableElements.set(elementId, element);
+                // Check for explicit type or infer from element tag
+                const explicitType = element.getAttribute("data-editable-type");
+                if (explicitType === "image" || (!explicitType && element.tagName === "IMG")) {
+                    this.editableTypes.set(elementId, "image");
+                } else {
+                    this.editableTypes.set(elementId, "text");
+                }
             }
         });
+    }
+
+    private getEditableType(elementId: string): EditableType {
+        return this.editableTypes.get(elementId) || "text";
     }
 
     private setupAuthUI(): void {
@@ -215,6 +229,7 @@ class EditorController {
 
         this.editableElements.forEach((element, elementId) => {
             element.classList.add("streamlined-editable");
+            const elementType = this.getEditableType(elementId);
 
             if (!element.dataset.scmsClickHandler) {
                 element.addEventListener("click", (e) => {
@@ -225,6 +240,18 @@ class EditorController {
                     }
                 });
                 element.dataset.scmsClickHandler = "true";
+            }
+
+            // Add double-click handler for images to open media manager
+            if (elementType === "image" && !element.dataset.scmsDblClickHandler) {
+                element.addEventListener("dblclick", (e) => {
+                    if (this.currentMode === "author") {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        this.handleChangeImage();
+                    }
+                });
+                element.dataset.scmsDblClickHandler = "true";
             }
         });
 
@@ -263,6 +290,8 @@ class EditorController {
         toolbar.id = "scms-toolbar";
         toolbar.mode = this.currentMode;
         toolbar.activeElement = this.editingElementId;
+        toolbar.appUrl = this.config.appUrl;
+        toolbar.appId = this.config.appId;
 
         toolbar.addEventListener("mode-change", ((e: CustomEvent<{ mode: EditorMode }>) => {
             this.setMode(e.detail.mode);
@@ -278,6 +307,10 @@ class EditorController {
 
         toolbar.addEventListener("edit-html", () => {
             this.handleEditHtml();
+        });
+
+        toolbar.addEventListener("change-image", () => {
+            this.handleChangeImage();
         });
 
         toolbar.addEventListener("sign-out", () => {
@@ -371,7 +404,8 @@ class EditorController {
             return;
         }
 
-        this.log.trace("Starting edit", { elementId });
+        const elementType = this.getEditableType(elementId);
+        this.log.trace("Starting edit", { elementId, elementType });
 
         // Stop editing previous element if any
         if (this.editingElementId) {
@@ -382,25 +416,34 @@ class EditorController {
             }
         }
 
-        // Store original content for reset
+        // Store original content for reset (src for images, innerHTML for text)
         if (!this.originalContent.has(elementId)) {
-            this.originalContent.set(elementId, element.innerHTML);
+            if (elementType === "image" && element instanceof HTMLImageElement) {
+                this.originalContent.set(elementId, element.src);
+            } else {
+                this.originalContent.set(elementId, element.innerHTML);
+            }
         }
 
-        // Add input listener to track changes
-        if (!element.dataset.scmsInputHandler) {
+        // Add input listener to track changes (only for text elements)
+        if (elementType !== "image" && !element.dataset.scmsInputHandler) {
             element.addEventListener("input", () => this.updateToolbarHasChanges());
             element.dataset.scmsInputHandler = "true";
         }
 
         this.editingElementId = elementId;
         element.classList.add("streamlined-editing");
-        element.setAttribute("contenteditable", "true");
-        element.focus();
+
+        // Only make text elements contenteditable
+        if (elementType !== "image") {
+            element.setAttribute("contenteditable", "true");
+            element.focus();
+        }
 
         // Update toolbar
         if (this.toolbar) {
             this.toolbar.activeElement = elementId;
+            this.toolbar.activeElementType = elementType;
         }
     }
 
@@ -422,6 +465,7 @@ class EditorController {
         // Update toolbar
         if (this.toolbar) {
             this.toolbar.activeElement = null;
+            this.toolbar.activeElementType = null;
         }
     }
 
@@ -429,7 +473,11 @@ class EditorController {
         const dirty = new Map<string, string>();
         this.editableElements.forEach((element, elementId) => {
             const original = this.originalContent.get(elementId);
-            const current = element.innerHTML;
+            const elementType = this.getEditableType(elementId);
+            const current =
+                elementType === "image" && element instanceof HTMLImageElement
+                    ? element.src
+                    : element.innerHTML;
             if (original !== undefined && current !== original) {
                 dirty.set(elementId, current);
             }
@@ -530,11 +578,39 @@ class EditorController {
         const elementId = this.editingElementId;
         const element = this.editableElements.get(elementId);
         const originalContent = this.originalContent.get(elementId);
+        const elementType = this.getEditableType(elementId);
 
         if (element && originalContent !== undefined) {
-            this.log.debug("Resetting element", { elementId });
-            element.innerHTML = originalContent;
+            this.log.debug("Resetting element", { elementId, elementType });
+            if (elementType === "image" && element instanceof HTMLImageElement) {
+                element.src = originalContent;
+            } else {
+                element.innerHTML = originalContent;
+            }
             this.updateToolbarHasChanges();
+        }
+    }
+
+    private async handleChangeImage(): Promise<void> {
+        if (!this.editingElementId) {
+            this.log.debug("No element selected for image change");
+            return;
+        }
+
+        const elementId = this.editingElementId;
+        const element = this.editableElements.get(elementId);
+        if (!element || !(element instanceof HTMLImageElement)) {
+            this.log.warn("Selected element is not an image");
+            return;
+        }
+
+        this.log.debug("Opening media manager for image change", { elementId });
+
+        const file = await this.openMediaManager();
+        if (file) {
+            element.src = file.publicUrl;
+            this.updateToolbarHasChanges();
+            this.log.debug("Image changed", { elementId, newUrl: file.publicUrl });
         }
     }
 
@@ -588,18 +664,37 @@ class EditorController {
             this.htmlEditorModal = null;
         }
     }
+
+    /**
+     * Open media manager popup for file selection
+     * Returns selected file on success, null if user cancels or closes popup
+     */
+    public async openMediaManager(): Promise<MediaFile | null> {
+        this.log.debug("Opening media manager popup");
+        const file = await this.auth.openMediaManager();
+        if (file) {
+            this.log.debug("Media file selected", { fileId: file.fileId, filename: file.filename });
+        } else {
+            this.log.debug("Media manager closed without selection");
+        }
+        return file;
+    }
 }
 
 /**
  * Initialize the lazy-loaded functionality
  */
-export async function initLazy(config: ViewerConfig): Promise<void> {
+export async function initLazy(config: ViewerConfig): Promise<EditorController> {
     const controller = new EditorController(config);
     await controller.init();
+    return controller;
 }
 
 // Auto-initialize when loaded directly
 const config = getConfigFromScriptTag();
 if (config) {
-    initLazy(config);
+    initLazy(config).then((controller) => {
+        // Expose SDK on window for console access and programmatic use
+        (window as unknown as { StreamlinedCMS: EditorController }).StreamlinedCMS = controller;
+    });
 }

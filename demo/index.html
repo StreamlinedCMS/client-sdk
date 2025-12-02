@@ -138,16 +138,16 @@
     <body>
         <div class="container">
             <div class="info-box">
-                <h3>Live Demo</h3>
-                <p>
+                <h3 data-editable="info-title">Live Demo</h3>
+                <p data-editable="info-text1">
                     Click the <strong>Sign In</strong> link in the footer to authenticate, then
-                    click any text with a blue dashed outline to edit it.
+                    click any text with a red dashed outline to edit it.
                 </p>
-                <p>
+                <p data-editable="info-text2">
                     <strong>Integration:</strong> Just one <code>&lt;script&gt;</code> tag with data
                     attributes!
                 </p>
-                <p><strong>App ID:</strong> localhost</p>
+                <p data-editable="info-text3"><strong>App ID:</strong> localhost</p>
             </div>
 
             <header>
@@ -200,10 +200,27 @@
                     account to enable editing mode.
                 </p>
             </div>
+
+            <div class="content-section">
+                <h2 data-editable="media-heading">Media Demo</h2>
+                <p data-editable="media-text">
+                    Click the image to select it, then use the "Change Image" button in the
+                    toolbar or double-click to open the media manager:
+                </p>
+                <div style="margin-top: 20px; text-align: center;">
+                    <img
+                        data-editable="hero-image"
+                        data-editable-type="image"
+                        src="https://placehold.co/400x300?text=Editable+Image"
+                        alt="Demo image"
+                        style="max-width: 100%; border-radius: 8px;"
+                    />
+                </div>
+            </div>
         </div>
 
         <footer>
-            <p>&copy; 2025 Demo Site Inc. | <a href="#" data-scms-signin>Sign In</a></p>
+            <p><span data-editable="copyright">&copy; 2025 Demo Site Inc.</span> | <a href="#" data-scms-signin>Sign In</a></p>
         </footer>
     </body>
 </html>

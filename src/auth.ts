@@ -2,13 +2,13 @@
  * Authentication module for StreamlinedCMS SDK
  *
  * Handles:
- * - SDK bridge iframe for cross-origin communication
  * - Login popup for user authentication
+ * - Media manager popup for file selection
  * - API key storage in localStorage with expiry
  * - Mode preference storage (author/viewer)
  */
 
-import { WindowMessenger, connect, type Connection } from "penpal";
+import { WindowMessenger, connect } from "penpal";
 
 const STORAGE_KEY = "scms_auth";
 const MODE_STORAGE_KEY = "scms_mode";
@@ -23,20 +23,24 @@ interface StoredAuth {
 
 export type EditorMode = "author" | "viewer";
 
-interface BridgeMethods {
-    [key: string]: Function;
-}
-
 export interface AuthConfig {
     appId: string;
     appUrl: string; // e.g., 'https://app.streamlinedcms.com'
 }
 
+export interface MediaFile {
+    fileId: string;
+    filename: string;
+    extension: string;
+    contentType: string;
+    size: number;
+    uploadedAt: string;
+    uploadedBy?: string;
+    publicUrl: string;
+}
+
 export class Auth {
     private config: AuthConfig;
-    private bridgeIframe: HTMLIFrameElement | null = null;
-    private bridgeConnection: Connection<BridgeMethods> | null = null;
-    private bridgeReady: Promise<void> | null = null;
 
     constructor(config: AuthConfig) {
         this.config = config;
@@ -127,40 +131,6 @@ export class Auth {
     }
 
     /**
-     * Initialize the SDK bridge iframe for cross-origin communication
-     */
-    async initBridge(): Promise<void> {
-        if (this.bridgeReady) return this.bridgeReady;
-
-        this.bridgeReady = new Promise((resolve, reject) => {
-            // Create hidden iframe
-            this.bridgeIframe = document.createElement("iframe");
-            this.bridgeIframe.src = `${this.config.appUrl}/sdk-bridge`;
-            this.bridgeIframe.style.display = "none";
-            this.bridgeIframe.setAttribute("aria-hidden", "true");
-            document.body.appendChild(this.bridgeIframe);
-
-            // Set up penpal connection
-            const messenger = new WindowMessenger({
-                remoteWindow: this.bridgeIframe.contentWindow!,
-                allowedOrigins: [new URL(this.config.appUrl).origin],
-            });
-
-            this.bridgeConnection = connect<BridgeMethods>({
-                messenger,
-                methods: {
-                    // Methods the bridge can call on the SDK (currently none)
-                },
-                timeout: 10000,
-            });
-
-            this.bridgeConnection.promise.then(() => resolve()).catch(reject);
-        });
-
-        return this.bridgeReady;
-    }
-
-    /**
      * Open login popup and wait for authentication
      * Returns API key on success, null if user closes popup
      */
@@ -217,17 +187,71 @@ export class Auth {
     }
 
     /**
-     * Clean up resources
+     * Open media manager popup and wait for selection
+     * Returns selected file on success, null if user closes popup or cancels
+     */
+    async openMediaManager(): Promise<MediaFile | null> {
+        return new Promise((resolve) => {
+            const width = 800;
+            const height = 600;
+            const left = window.screenX + (window.outerWidth - width) / 2;
+            const top = window.screenY + (window.outerHeight - height) / 2;
+
+            const popup = window.open(
+                `${this.config.appUrl}/media?appId=${encodeURIComponent(this.config.appId)}`,
+                "scms-media",
+                `width=${width},height=${height},left=${left},top=${top},popup=yes`,
+            );
+
+            if (!popup) {
+                resolve(null);
+                return;
+            }
+
+            // Set up penpal to receive selection from popup
+            const messenger = new WindowMessenger({
+                remoteWindow: popup,
+                allowedOrigins: [new URL(this.config.appUrl).origin],
+            });
+
+            const connection = connect<Record<string, never>>({
+                messenger,
+                methods: {
+                    // Method the popup calls to send selected file
+                    receiveMediaSelection: (result: { file: MediaFile }) => {
+                        resolve(result.file);
+                        // Delay cleanup to allow method to return to popup
+                        setTimeout(cleanup, 0);
+                    },
+                    // Method the popup calls when user cancels
+                    receiveMediaCancel: () => {
+                        resolve(null);
+                        // Delay cleanup to allow method to return to popup
+                        setTimeout(cleanup, 0);
+                    },
+                },
+                timeout: 600000, // 10 minutes for user to select media
+            });
+
+            // Poll for popup close (user closed window)
+            const checkClosed = setInterval(() => {
+                if (popup.closed) {
+                    cleanup();
+                    resolve(null);
+                }
+            }, POPUP_CHECK_INTERVAL);
+
+            const cleanup = () => {
+                clearInterval(checkClosed);
+                connection.destroy();
+            };
+        });
+    }
+
+    /**
+     * Clean up resources (no-op, kept for API compatibility)
      */
     destroy(): void {
-        if (this.bridgeConnection) {
-            this.bridgeConnection.destroy();
-            this.bridgeConnection = null;
-        }
-        if (this.bridgeIframe) {
-            this.bridgeIframe.remove();
-            this.bridgeIframe = null;
-        }
-        this.bridgeReady = null;
+        // No resources to clean up - popups are self-contained
     }
 }

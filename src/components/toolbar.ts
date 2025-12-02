@@ -27,11 +27,20 @@ export class Toolbar extends LitElement {
     @property({ type: String, attribute: "active-element" })
     activeElement: string | null = null;
 
+    @property({ type: String, attribute: "active-element-type" })
+    activeElementType: string | null = null;
+
     @property({ type: Boolean, attribute: "has-changes" })
     hasChanges = false;
 
     @property({ type: Boolean })
     saving = false;
+
+    @property({ type: String, attribute: "app-url" })
+    appUrl: string | null = null;
+
+    @property({ type: String, attribute: "app-id" })
+    appId: string | null = null;
 
     @state()
     private expanded = false;
@@ -127,6 +136,15 @@ export class Toolbar extends LitElement {
         );
     }
 
+    private handleChangeImage() {
+        this.dispatchEvent(
+            new CustomEvent("change-image", {
+                bubbles: true,
+                composed: true,
+            })
+        );
+    }
+
     private renderModeToggle() {
         return html`
             <scms-mode-toggle
@@ -137,13 +155,25 @@ export class Toolbar extends LitElement {
     }
 
     private renderEditHtmlButton() {
-        if (!this.activeElement) return nothing;
+        if (!this.activeElement || this.activeElementType === "image") return nothing;
         return html`
             <button
                 class="px-3 py-1.5 text-xs font-medium text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
                 @click=${this.handleEditHtml}
             >
                 Edit HTML
+            </button>
+        `;
+    }
+
+    private renderChangeImageButton() {
+        if (!this.activeElement || this.activeElementType !== "image") return nothing;
+        return html`
+            <button
+                class="px-3 py-1.5 text-xs font-medium text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+                @click=${this.handleChangeImage}
+            >
+                Change Image
             </button>
         `;
     }
@@ -167,6 +197,23 @@ export class Toolbar extends LitElement {
             >
                 Sign Out
             </button>
+        `;
+    }
+
+    private renderAdminLink() {
+        if (!this.appUrl || !this.appId) return nothing;
+        const adminUrl = `${this.appUrl}/apps/${encodeURIComponent(this.appId)}`;
+        return html`
+            <a
+                href=${adminUrl}
+                target="_blank"
+                class="px-3 py-1.5 text-xs font-medium text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors inline-flex items-center gap-1"
+            >
+                Admin
+                <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+            </a>
         `;
     }
 
@@ -201,18 +248,21 @@ export class Toolbar extends LitElement {
                         ${this.renderModeToggle()}
                     </div>
 
-                    <!-- Center: Reset + Active element + Edit HTML -->
+                    <!-- Center: Reset + Active element + Edit HTML/Change Image -->
                     <div class="flex items-center gap-3">
                         ${this.renderResetButton()}
                         ${this.renderActiveElement()}
                         ${this.renderEditHtmlButton()}
+                        ${this.renderChangeImageButton()}
                     </div>
 
-                    <!-- Right: Save + Sign Out (separated) -->
+                    <!-- Right: Save + Sign Out + Admin (separated) -->
                     <div class="flex items-center">
                         ${this.renderSaveButton()}
-                        <div class="ml-6 pl-6 border-l border-gray-200">
+                        <div class="ml-6 pl-6 border-l border-gray-200 flex items-center">
                             ${this.renderSignOutButton()}
+                            <span class="mx-2 text-gray-300">|</span>
+                            ${this.renderAdminLink()}
                         </div>
                     </div>
                 </div>
@@ -244,10 +294,11 @@ export class Toolbar extends LitElement {
                             `}
                     </button>
 
-                    <!-- Center: Element badge + Edit HTML -->
+                    <!-- Center: Element badge + Edit HTML/Change Image -->
                     <div class="flex-1 flex items-center justify-center gap-2">
                         ${this.renderActiveElement()}
                         ${this.renderEditHtmlButton()}
+                        ${this.renderChangeImageButton()}
                     </div>
 
                     <!-- Save (right) -->
@@ -276,14 +327,29 @@ export class Toolbar extends LitElement {
                             <span class="text-xs font-medium text-gray-700">Mode</span>
                             ${this.renderModeToggle()}
                         </div>
-                        <!-- Sign Out (separated at bottom, centered) -->
-                        <div class="pt-2 mt-2 border-t border-gray-200 flex justify-center">
+                        <!-- Sign Out + Admin (separated at bottom, centered) -->
+                        <div class="pt-2 mt-2 border-t border-gray-200 flex justify-center items-center">
                             <button
                                 class="px-3 py-2 text-sm font-medium text-gray-400 hover:text-gray-600 transition-colors"
                                 @click=${this.handleSignOut}
                             >
                                 Sign Out
                             </button>
+                            ${this.appUrl && this.appId
+                                ? html`
+                                    <span class="mx-2 text-gray-300">|</span>
+                                    <a
+                                        href="${this.appUrl}/apps/${encodeURIComponent(this.appId)}"
+                                        target="_blank"
+                                        class="px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors inline-flex items-center gap-1"
+                                    >
+                                        Admin
+                                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                        </svg>
+                                    </a>
+                                `
+                                : nothing}
                         </div>
                     </div>
                 </div>
