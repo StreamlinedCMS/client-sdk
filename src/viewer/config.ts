@@ -32,8 +32,8 @@ export function getConfigFromScriptTag(): ViewerConfig | null {
     }
 
     return {
-        apiUrl: scriptTag.dataset.apiUrl || "https://streamlined-cms-api-worker-staging.whi.workers.dev",
-        appUrl: scriptTag.dataset.appUrl || "https://streamlined-cms-app-gui-staging.whi.workers.dev",
+        apiUrl: scriptTag.dataset.apiUrl || __SDK_API_URL__,
+        appUrl: scriptTag.dataset.appUrl || __SDK_APP_URL__,
         appId,
         logLevel: scriptTag.dataset.logLevel,
         mockAuth: scriptTag.dataset.mockAuth === "true"

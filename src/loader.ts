@@ -22,7 +22,7 @@
         return;
     }
 
-    const apiUrl = loaderScript.dataset.apiUrl || "https://streamlined-cms-api-worker-staging.whi.workers.dev";
+    const apiUrl = loaderScript.dataset.apiUrl || __SDK_API_URL__;
 
     // Inject preconnect hint immediately to start TLS handshake early
     const apiOrigin = new URL(apiUrl).origin;

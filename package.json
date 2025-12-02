@@ -10,6 +10,8 @@
   ],
   "scripts": {
     "build": "rollup -c",
+    "build:staging": "MODE=staging rollup -c",
+    "deploy:staging": "npm run build:staging && wrangler pages deploy dist --project-name streamlined-cms-cdn-staging",
     "dev": "rollup -c -w",
     "demo": "npm run build && ln -sf ../dist demo/dist && vite demo --port 3000",
     "test": "vitest run",
@@ -32,6 +34,8 @@
   ],
   "devDependencies": {
     "@rollup/plugin-node-resolve": "^15.3.0",
+    "@rollup/plugin-replace": "^6.0.3",
+    "@rollup/plugin-terser": "^0.4.4",
     "@rollup/plugin-typescript": "^12.1.2",
     "@tailwindcss/postcss": "^4.1.17",
     "@vitest/coverage-v8": "^2.1.8",

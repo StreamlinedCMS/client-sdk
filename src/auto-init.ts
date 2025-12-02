@@ -84,8 +84,8 @@ function autoInit(): void {
     const config = getConfigFromScriptTag();
 
     // Default URLs if not provided
-    const apiUrl = config.apiUrl || "https://streamlined-cms-api-worker-staging.whi.workers.dev";
-    const appUrl = config.appUrl || "https://streamlined-cms-app-gui-staging.whi.workers.dev";
+    const apiUrl = config.apiUrl || __SDK_API_URL__;
+    const appUrl = config.appUrl || __SDK_APP_URL__;
 
     // App ID is required
     if (!config.appId) {
