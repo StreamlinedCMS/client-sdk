@@ -1,11 +1,14 @@
 /**
  * Mode Toggle Component
  *
- * A Lit web component that displays Author/Viewer mode toggle
- * with a sign-out link. Uses Shadow DOM with Tailwind for styling.
+ * A Lit web component that displays an Author/Viewer mode toggle switch.
+ * Uses Shadow DOM with Tailwind for styling.
+ *
+ * This is a composable component - it has no positioning and can be used
+ * inside other components like the toolbar.
  */
 
-import { LitElement, html, css } from "lit";
+import { LitElement, html } from "lit";
 import { customElement, property } from "lit/decorators.js";
 import { styleMap } from "lit/directives/style-map.js";
 import { tailwindSheet } from "./styles.js";
@@ -17,17 +20,7 @@ export class ModeToggle extends LitElement {
     @property({ type: String })
     mode: EditorMode = "viewer";
 
-    static styles = [
-        tailwindSheet,
-        css`
-            :host {
-                position: fixed;
-                bottom: 20px;
-                left: 20px;
-                z-index: 10000;
-            }
-        `,
-    ];
+    static styles = [tailwindSheet];
 
     private handleModeChange(newMode: EditorMode) {
         if (newMode !== this.mode) {
@@ -42,47 +35,34 @@ export class ModeToggle extends LitElement {
         }
     }
 
-    private handleSignOut() {
-        this.dispatchEvent(
-            new CustomEvent("sign-out", {
-                bubbles: true,
-                composed: true,
-            })
-        );
-    }
-
     render() {
         const isViewer = this.mode === "viewer";
         const sliderStyles = {
             transition: "transform 0.2s ease-out",
             transform: `translateX(${isViewer ? "0" : "100%"})`,
         };
+
+        const baseButtonClasses =
+            "relative z-10 px-3 py-1 border-none bg-transparent rounded-full cursor-pointer text-xs font-medium transition-colors";
+
         return html`
-            <div class="flex flex-col items-start gap-1.5 text-xs font-medium">
-                <div class="relative flex items-center bg-gray-100 p-1 rounded-full shadow-md border border-gray-200">
-                    <div
-                        class="absolute left-1 top-1 bottom-1 w-[calc(50%-4px)] bg-white rounded-full shadow"
-                        style=${styleMap(sliderStyles)}
-                    ></div>
-                    <button
-                        class="relative z-10 px-4 py-1.5 border-none bg-transparent rounded-full cursor-pointer text-xs font-medium transition-colors ${isViewer ? "text-gray-900" : "text-gray-500 hover:text-gray-700"}"
-                        @click="${() => this.handleModeChange("viewer")}"
-                    >
-                        Viewer
-                    </button>
-                    <button
-                        class="relative z-10 px-4 py-1.5 border-none bg-transparent rounded-full cursor-pointer text-xs font-medium transition-colors ${!isViewer ? "text-gray-900" : "text-gray-500 hover:text-gray-700"}"
-                        @click="${() => this.handleModeChange("author")}"
-                    >
-                        Author
-                    </button>
-                </div>
-                <a
-                    class="text-[11px] text-gray-400 no-underline pl-2 cursor-pointer hover:underline"
-                    @click="${this.handleSignOut}"
+            <div class="relative flex items-center bg-gray-100 p-1 rounded-full">
+                <div
+                    class="absolute left-1 top-1 bottom-1 w-[calc(50%-4px)] bg-white rounded-full shadow"
+                    style=${styleMap(sliderStyles)}
+                ></div>
+                <button
+                    class="${baseButtonClasses} ${isViewer ? "text-gray-900" : "text-gray-500 hover:text-gray-700"}"
+                    @click=${() => this.handleModeChange("viewer")}
                 >
-                    Sign Out
-                </a>
+                    Viewer
+                </button>
+                <button
+                    class="${baseButtonClasses} ${!isViewer ? "text-gray-900" : "text-gray-500 hover:text-gray-700"}"
+                    @click=${() => this.handleModeChange("author")}
+                >
+                    Author
+                </button>
             </div>
         `;
     }

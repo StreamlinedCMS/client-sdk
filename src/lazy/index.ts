@@ -5,7 +5,7 @@
  * It contains:
  * - Loganite logger (for detailed logging)
  * - Auth module (API key management, login popup)
- * - Lit web components (sign-in link, mode toggle)
+ * - Lit web components (sign-in link, toolbar)
  * - Editing functionality
  */
 
@@ -14,9 +14,15 @@ import { Auth, type EditorMode } from "../auth.js";
 import { getConfigFromScriptTag, type ViewerConfig } from "../viewer/config.js";
 
 // Import Lit components to register them
-import "../components/mode-toggle.js";
+import "../components/toolbar.js";
 import "../components/sign-in-link.js";
-import type { ModeToggle } from "../components/mode-toggle.js";
+import "../components/html-editor-modal.js";
+import type { Toolbar } from "../components/toolbar.js";
+import type { HtmlEditorModal } from "../components/html-editor-modal.js";
+
+// Toolbar height constants
+const TOOLBAR_HEIGHT_DESKTOP = 48;
+const TOOLBAR_HEIGHT_MOBILE = 56;
 
 class EditorController {
     private config: ViewerConfig;
@@ -25,9 +31,13 @@ class EditorController {
     private apiKey: string | null = null;
     private currentMode: EditorMode = "viewer";
     private editableElements: Map<string, HTMLElement> = new Map();
-    private editingElement: HTMLElement | null = null;
+    private originalContent: Map<string, string> = new Map();
+    private editingElementId: string | null = null;
     private customSignInTrigger: Element | null = null;
     private customSignInOriginalText: string | null = null;
+    private toolbar: Toolbar | null = null;
+    private htmlEditorModal: HtmlEditorModal | null = null;
+    private saving = false;
 
     constructor(config: ViewerConfig) {
         this.config = config;
@@ -103,7 +113,7 @@ class EditorController {
     }
 
     private showSignInLink(): void {
-        this.removeModeToggle();
+        this.removeToolbar();
 
         // Check for custom trigger
         const customTrigger = document.querySelector("[data-scms-signin]");
@@ -137,6 +147,26 @@ class EditorController {
     private handleSignOutClick = (e: Event): void => {
         e.preventDefault();
         this.signOut();
+    };
+
+    private handleDocumentClick = (e: Event): void => {
+        if (!this.editingElementId) return;
+
+        const target = e.target as Node;
+
+        // Don't deselect if clicking inside an editable element
+        for (const element of this.editableElements.values()) {
+            if (element.contains(target)) {
+                return;
+            }
+        }
+
+        // Don't deselect if clicking inside the toolbar
+        if (this.toolbar?.contains(target)) {
+            return;
+        }
+
+        this.stopEditing();
     };
 
     private async handleSignIn(): Promise<void> {
@@ -173,6 +203,11 @@ class EditorController {
         } else {
             this.enableViewerMode();
         }
+
+        // Update toolbar mode
+        if (this.toolbar) {
+            this.toolbar.mode = mode;
+        }
     }
 
     private enableAuthorMode(): void {
@@ -185,6 +220,7 @@ class EditorController {
                 element.addEventListener("click", (e) => {
                     if (this.currentMode === "author") {
                         e.preventDefault();
+                        e.stopPropagation();
                         this.startEditing(elementId);
                     }
                 });
@@ -192,8 +228,11 @@ class EditorController {
             }
         });
 
+        // Add click-outside handler to deselect elements
+        document.addEventListener("click", this.handleDocumentClick);
+
         this.injectEditStyles();
-        this.showModeToggle();
+        this.showToolbar();
     }
 
     private enableViewerMode(): void {
@@ -204,38 +243,68 @@ class EditorController {
             element.removeAttribute("contenteditable");
         });
 
-        this.hideSaveButton();
-        this.editingElement = null;
-        this.showModeToggle();
+        // Remove click-outside handler
+        document.removeEventListener("click", this.handleDocumentClick);
+
+        this.stopEditing();
+        this.showToolbar();
     }
 
-    private showModeToggle(): void {
-        // Update existing toggle if present, otherwise create new one
-        const existing = document.getElementById("scms-mode-toggle") as ModeToggle | null;
-        if (existing) {
-            existing.mode = this.currentMode;
+    private showToolbar(): void {
+        // Update existing toolbar if present
+        if (this.toolbar) {
+            this.toolbar.mode = this.currentMode;
+            this.toolbar.activeElement = this.editingElementId;
             return;
         }
 
-        // Create new Lit component
-        const toggle = document.createElement("scms-mode-toggle") as ModeToggle;
-        toggle.id = "scms-mode-toggle";
-        toggle.mode = this.currentMode;
+        // Create new toolbar
+        const toolbar = document.createElement("scms-toolbar") as Toolbar;
+        toolbar.id = "scms-toolbar";
+        toolbar.mode = this.currentMode;
+        toolbar.activeElement = this.editingElementId;
 
-        toggle.addEventListener("mode-change", ((e: CustomEvent<{ mode: EditorMode }>) => {
+        toolbar.addEventListener("mode-change", ((e: CustomEvent<{ mode: EditorMode }>) => {
             this.setMode(e.detail.mode);
         }) as EventListener);
 
-        toggle.addEventListener("sign-out", () => {
+        toolbar.addEventListener("save", () => {
+            this.handleSave();
+        });
+
+        toolbar.addEventListener("reset", () => {
+            this.handleReset();
+        });
+
+        toolbar.addEventListener("edit-html", () => {
+            this.handleEditHtml();
+        });
+
+        toolbar.addEventListener("sign-out", () => {
             this.signOut();
         });
 
-        document.body.appendChild(toggle);
+        document.body.appendChild(toolbar);
+        this.toolbar = toolbar;
+
+        // Add body padding to prevent content overlap
+        this.updateBodyPadding();
+        window.addEventListener("resize", this.updateBodyPadding);
     }
 
-    private removeModeToggle(): void {
-        const existing = document.getElementById("scms-mode-toggle");
-        if (existing) existing.remove();
+    private updateBodyPadding = (): void => {
+        const isMobile = window.innerWidth < 640;
+        const height = isMobile ? TOOLBAR_HEIGHT_MOBILE : TOOLBAR_HEIGHT_DESKTOP;
+        document.body.style.paddingBottom = `${height}px`;
+    };
+
+    private removeToolbar(): void {
+        if (this.toolbar) {
+            this.toolbar.remove();
+            this.toolbar = null;
+            document.body.style.paddingBottom = "";
+            window.removeEventListener("resize", this.updateBodyPadding);
+        }
     }
 
     private signOut(): void {
@@ -248,8 +317,7 @@ class EditorController {
             element.classList.remove("streamlined-editable", "streamlined-editing");
             element.removeAttribute("contenteditable");
         });
-        this.hideSaveButton();
-        this.editingElement = null;
+        this.stopEditing();
 
         // Convert custom trigger back to sign-in
         if (this.customSignInTrigger) {
@@ -260,7 +328,7 @@ class EditorController {
             this.customSignInTrigger.addEventListener("click", this.handleSignInClick);
         }
 
-        this.removeModeToggle();
+        this.removeToolbar();
 
         // Only show default sign-in link if no custom trigger
         if (!this.customSignInTrigger) {
@@ -285,38 +353,12 @@ class EditorController {
             }
 
             .streamlined-editable:hover {
-                outline-color: #3b82f6;
+                outline-color: #ef4444;
             }
 
             .streamlined-editing {
-                outline: 2px solid #3b82f6;
+                outline: 2px solid #ef4444;
                 outline-offset: 2px;
-            }
-
-            .streamlined-save-button {
-                position: fixed;
-                bottom: 20px;
-                right: 20px;
-                padding: 12px 24px;
-                background: #3b82f6;
-                color: white;
-                border: none;
-                border-radius: 6px;
-                font-size: 14px;
-                font-weight: 600;
-                cursor: pointer;
-                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-                z-index: 10000;
-                transition: background 0.2s;
-            }
-
-            .streamlined-save-button:hover {
-                background: #2563eb;
-            }
-
-            .streamlined-save-button:disabled {
-                background: #9ca3af;
-                cursor: not-allowed;
             }
         `;
         document.head.appendChild(style);
@@ -331,109 +373,219 @@ class EditorController {
 
         this.log.trace("Starting edit", { elementId });
 
-        if (this.editingElement) {
-            this.stopEditing();
+        // Stop editing previous element if any
+        if (this.editingElementId) {
+            const prevElement = this.editableElements.get(this.editingElementId);
+            if (prevElement) {
+                prevElement.classList.remove("streamlined-editing");
+                prevElement.setAttribute("contenteditable", "false");
+            }
         }
 
-        this.editingElement = element;
+        // Store original content for reset
+        if (!this.originalContent.has(elementId)) {
+            this.originalContent.set(elementId, element.innerHTML);
+        }
+
+        // Add input listener to track changes
+        if (!element.dataset.scmsInputHandler) {
+            element.addEventListener("input", () => this.updateToolbarHasChanges());
+            element.dataset.scmsInputHandler = "true";
+        }
+
+        this.editingElementId = elementId;
         element.classList.add("streamlined-editing");
         element.setAttribute("contenteditable", "true");
         element.focus();
 
-        this.showSaveButton(elementId);
+        // Update toolbar
+        if (this.toolbar) {
+            this.toolbar.activeElement = elementId;
+        }
     }
 
     private stopEditing(): void {
-        if (!this.editingElement) {
+        if (!this.editingElementId) {
             return;
         }
 
         this.log.trace("Stopping edit");
 
-        this.editingElement.classList.remove("streamlined-editing");
-        this.editingElement.setAttribute("contenteditable", "false");
-        this.editingElement = null;
+        const element = this.editableElements.get(this.editingElementId);
+        if (element) {
+            element.classList.remove("streamlined-editing");
+            element.setAttribute("contenteditable", "false");
+        }
 
-        this.hideSaveButton();
-    }
+        this.editingElementId = null;
 
-    private showSaveButton(elementId: string): void {
-        this.hideSaveButton();
-
-        const button = document.createElement("button");
-        button.id = "streamlined-save-btn";
-        button.className = "streamlined-save-button";
-        button.textContent = "Save Changes";
-
-        button.addEventListener("click", async () => {
-            await this.saveElement(elementId);
-        });
-
-        document.body.appendChild(button);
-    }
-
-    private hideSaveButton(): void {
-        const button = document.getElementById("streamlined-save-btn");
-        if (button) {
-            button.remove();
+        // Update toolbar
+        if (this.toolbar) {
+            this.toolbar.activeElement = null;
         }
     }
 
-    private async saveElement(elementId: string): Promise<void> {
+    private getDirtyElements(): Map<string, string> {
+        const dirty = new Map<string, string>();
+        this.editableElements.forEach((element, elementId) => {
+            const original = this.originalContent.get(elementId);
+            const current = element.innerHTML;
+            if (original !== undefined && current !== original) {
+                dirty.set(elementId, current);
+            }
+        });
+        return dirty;
+    }
+
+    private updateToolbarHasChanges(): void {
+        if (this.toolbar) {
+            this.toolbar.hasChanges = this.getDirtyElements().size > 0;
+        }
+    }
+
+    private async handleSave(): Promise<void> {
+        const dirtyElements = this.getDirtyElements();
+        if (dirtyElements.size === 0 || this.saving) {
+            return;
+        }
+
+        this.log.debug("Saving all dirty elements", { count: dirtyElements.size });
+
+        this.saving = true;
+        if (this.toolbar) {
+            this.toolbar.saving = true;
+        }
+
+        const headers: Record<string, string> = {
+            "Content-Type": "application/json",
+        };
+        if (this.apiKey) {
+            headers["Authorization"] = `Bearer ${this.apiKey}`;
+        }
+
+        const errors: string[] = [];
+        const saved: string[] = [];
+
+        try {
+            // Save all dirty elements in parallel
+            const savePromises = Array.from(dirtyElements.entries()).map(
+                async ([elementId, content]) => {
+                    const url = `${this.config.apiUrl}/apps/${this.config.appId}/content/${elementId}`;
+                    const response = await fetch(url, {
+                        method: "PUT",
+                        headers,
+                        body: JSON.stringify({ content }),
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`${elementId}: ${response.status} ${response.statusText}`);
+                    }
+
+                    await response.json();
+
+                    // Update original content to saved version
+                    this.originalContent.set(elementId, content);
+                    saved.push(elementId);
+                }
+            );
+
+            const results = await Promise.allSettled(savePromises);
+
+            results.forEach((result) => {
+                if (result.status === "rejected") {
+                    errors.push(result.reason?.message || "Unknown error");
+                }
+            });
+
+            this.auth.refreshKeyExpiry();
+
+            if (errors.length > 0) {
+                this.log.error("Some elements failed to save", { errors });
+                alert(`Failed to save some elements:\n${errors.join("\n")}`);
+            } else {
+                this.log.info("All content saved", { count: saved.length });
+                // Deselect element after successful save
+                this.stopEditing();
+            }
+
+            // Update toolbar
+            this.updateToolbarHasChanges();
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            this.log.error("Failed to save content", error);
+            alert(`Failed to save: ${errorMessage}\n\nCheck console for details.`);
+        } finally {
+            this.saving = false;
+            if (this.toolbar) {
+                this.toolbar.saving = false;
+            }
+        }
+    }
+
+    private handleReset(): void {
+        if (!this.editingElementId) {
+            return;
+        }
+
+        const elementId = this.editingElementId;
         const element = this.editableElements.get(elementId);
+        const originalContent = this.originalContent.get(elementId);
+
+        if (element && originalContent !== undefined) {
+            this.log.debug("Resetting element", { elementId });
+            element.innerHTML = originalContent;
+            this.updateToolbarHasChanges();
+        }
+    }
+
+    private handleEditHtml(): void {
+        if (!this.editingElementId) {
+            this.log.debug("No element selected for HTML editing");
+            return;
+        }
+
+        // Prevent opening multiple modals
+        if (this.htmlEditorModal) {
+            this.log.debug("HTML editor already open");
+            return;
+        }
+
+        const element = this.editableElements.get(this.editingElementId);
         if (!element) {
             return;
         }
 
-        const content = element.innerHTML;
-        this.log.debug("Saving element", { elementId });
+        this.log.debug("Opening HTML editor", { elementId: this.editingElementId });
 
-        const button = document.getElementById("streamlined-save-btn") as HTMLButtonElement;
-        if (button) {
-            button.disabled = true;
-            button.textContent = "Saving...";
-        }
+        // Create and show modal
+        const modal = document.createElement("scms-html-editor-modal") as HtmlEditorModal;
+        modal.elementId = this.editingElementId;
+        modal.content = element.innerHTML;
 
-        try {
-            const url = `${this.config.apiUrl}/apps/${this.config.appId}/content/${elementId}`;
-            const headers: Record<string, string> = {
-                "Content-Type": "application/json",
-            };
-            if (this.apiKey) {
-                headers["Authorization"] = `Bearer ${this.apiKey}`;
-            }
-            const response = await fetch(url, {
-                method: "PUT",
-                headers,
-                body: JSON.stringify({ content }),
-            });
+        // Prevent clicks inside modal from deselecting the element
+        modal.addEventListener("click", (e: Event) => {
+            e.stopPropagation();
+        });
 
-            if (!response.ok) {
-                throw new Error(`Failed to save: ${response.status} ${response.statusText}`);
-            }
+        modal.addEventListener("apply", ((e: CustomEvent<{ content: string }>) => {
+            element.innerHTML = e.detail.content;
+            this.closeHtmlEditor();
+            this.updateToolbarHasChanges();
+            this.log.debug("HTML applied", { elementId: this.editingElementId });
+        }) as EventListener);
 
-            await response.json();
+        modal.addEventListener("cancel", () => {
+            this.closeHtmlEditor();
+        });
 
-            this.auth.refreshKeyExpiry();
+        document.body.appendChild(modal);
+        this.htmlEditorModal = modal;
+    }
 
-            this.log.info("Content saved", { elementId });
-
-            if (button) {
-                button.textContent = "Saved!";
-                setTimeout(() => {
-                    this.stopEditing();
-                }, 1000);
-            }
-        } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            this.log.error("Failed to save content", error);
-
-            if (button) {
-                button.textContent = "Save Failed - Retry";
-                button.disabled = false;
-            }
-
-            alert(`Failed to save: ${errorMessage}\n\nCheck console for details.`);
+    private closeHtmlEditor(): void {
+        if (this.htmlEditorModal) {
+            this.htmlEditorModal.remove();
+            this.htmlEditorModal = null;
         }
     }
 }
