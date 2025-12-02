@@ -361,10 +361,12 @@ Iframe → SDK: { type: 'result', requestId: '123', payload: {...} }
 
 **Completed:** Two-phase loader architecture. Phase 1 loader (~2KB) handles FOUC prevention, config parsing, and content fetching. Phase 2 dynamically imports full SDK only when needed for auth/editing. SDK bridge iframe for cross-origin session checks via penpal.
 
-### Phase 5: Author Bundle
+### Phase 5: Author Bundle ✓
 - Editing toolbar component
 - Dynamic import on auth
 - Connect to existing editing functionality
+
+**Completed:** Full-width bottom toolbar with mobile-responsive design. Desktop shows mode toggle, element actions (reset, badge, edit HTML), and save with separated sign out. Mobile uses animated drawer with primary bar at top. New composable Lit components: element-badge (pulsing selection indicator), hold-button (800ms hold for reset), html-editor-modal (raw HTML editing with confirmation). Save PUTs all dirty elements in parallel. Click-outside deselection, body padding for fixed toolbar.
 
 ### Phase 6: Iframe Apps (Future)
 - Media manager
