@@ -151,17 +151,17 @@ class EditorController {
     }
 
     /**
-     * Get group ID for an element by checking data-group on self or ancestors
+     * Get group ID for an element by checking data-scms-group on self or ancestors
      */
     private getGroupId(element: HTMLElement): string | null {
         // First check the element itself
-        const selfGroup = element.getAttribute("data-group");
+        const selfGroup = element.getAttribute("data-scms-group");
         if (selfGroup) return selfGroup;
 
-        // Walk up to find nearest ancestor with data-group
+        // Walk up to find nearest ancestor with data-scms-group
         let parent = element.parentElement;
         while (parent) {
-            const parentGroup = parent.getAttribute("data-group");
+            const parentGroup = parent.getAttribute("data-scms-group");
             if (parentGroup) return parentGroup;
             parent = parent.parentElement;
         }
@@ -169,27 +169,29 @@ class EditorController {
     }
 
     private scanEditableElements(): void {
-        document.querySelectorAll<HTMLElement>("[data-editable]").forEach((element) => {
-            const elementId = element.getAttribute("data-editable");
-            if (elementId) {
+        const selector = "[data-scms-text], [data-scms-html], [data-scms-image], [data-scms-link]";
+        document.querySelectorAll<HTMLElement>(selector).forEach((element) => {
+            const info = this.getEditableInfo(element);
+            if (info) {
                 const groupId = this.getGroupId(element);
                 // Use composite key for grouped elements: groupId:elementId
-                const key = groupId ? `${groupId}:${elementId}` : elementId;
-                this.editableElements.set(key, { element, elementId, groupId });
-                // Check for explicit type or infer from element tag
-                const explicitType = element.getAttribute("data-editable-type") as EditableType | null;
-                if (explicitType === "image" || (!explicitType && element.tagName === "IMG")) {
-                    this.editableTypes.set(key, "image");
-                } else if (explicitType === "link") {
-                    this.editableTypes.set(key, "link");
-                } else if (explicitType === "text") {
-                    this.editableTypes.set(key, "text");
-                } else {
-                    // Default to html for backwards compatibility
-                    this.editableTypes.set(key, "html");
-                }
+                const key = groupId ? `${groupId}:${info.id}` : info.id;
+                this.editableElements.set(key, { element, elementId: info.id, groupId });
+                this.editableTypes.set(key, info.type);
             }
         });
+    }
+
+    /**
+     * Get editable info from element by checking data-scms-{type} attributes
+     */
+    private getEditableInfo(element: HTMLElement): { id: string; type: EditableType } | null {
+        const types: EditableType[] = ["text", "html", "image", "link"];
+        for (const type of types) {
+            const id = element.getAttribute(`data-scms-${type}`);
+            if (id) return { id, type };
+        }
+        return null;
     }
 
     private getEditableType(key: string): EditableType {
@@ -654,10 +656,11 @@ class EditorController {
 
     /**
      * Apply content to an element based on stored type
-     * Handles backwards compatibility for content without type field
      * Also extracts and applies attributes if present
      */
     private applyElementContent(key: string, info: EditableElementInfo, content: string): void {
+        const elementType = this.getEditableType(key);
+
         try {
             const data = JSON.parse(content) as (ContentData & { attributes?: ElementAttributes }) | { type?: undefined; attributes?: ElementAttributes };
 
@@ -679,9 +682,8 @@ class EditorController {
                 info.element.target = linkData.target;
                 info.element.textContent = linkData.text;
             } else if (!data.type) {
-                // No type field - infer from element's data-editable-type attribute
-                const attrType = info.element.getAttribute("data-editable-type");
-                if (attrType === "link" && info.element instanceof HTMLAnchorElement) {
+                // No type field in JSON - use element's declared type
+                if (elementType === "link" && info.element instanceof HTMLAnchorElement) {
                     const linkData = data as { href?: string; target?: string; text?: string };
                     if (linkData.href !== undefined) {
                         info.element.href = linkData.href;
@@ -689,31 +691,28 @@ class EditorController {
                         info.element.textContent = linkData.text || "";
                         return;
                     }
-                } else if (attrType === "image" && info.element instanceof HTMLImageElement) {
+                } else if (elementType === "image" && info.element instanceof HTMLImageElement) {
                     const imageData = data as { src?: string };
                     if (imageData.src !== undefined) {
                         info.element.src = imageData.src;
                         return;
                     }
-                } else if (attrType === "text") {
+                } else if (elementType === "text") {
                     const textData = data as { value?: string };
                     if (textData.value !== undefined) {
                         info.element.textContent = textData.value;
                         return;
                     }
-                } else if (attrType === "html") {
+                } else if (elementType === "html") {
                     const htmlData = data as { value?: string };
                     if (htmlData.value !== undefined) {
                         info.element.innerHTML = htmlData.value;
                         return;
                     }
                 }
-                // Unrecognized JSON - treat as html
-                info.element.innerHTML = content;
             }
         } catch {
-            // Not JSON - treat as legacy html content
-            info.element.innerHTML = content;
+            // Not JSON - ignore, content should always be JSON
         }
     }
 
@@ -1011,8 +1010,6 @@ class EditorController {
         const elementAttrs: ElementAttributes = {};
         const otherAttrs: ElementAttributes = {};
         const excludePatterns = [
-            /^data-editable/,
-            /^data-group$/,
             /^data-scms-/,
             /^class$/,
             /^id$/,

@@ -45,7 +45,7 @@ beforeAll(async () => {
             // Return new key-value format: { elements: {...}, groups: {...} }
             res.end(JSON.stringify({
                 elements: {
-                    "test-content": { content: "Loaded from API", updatedAt: new Date().toISOString() }
+                    "test-content": { content: JSON.stringify({ type: "html", value: "Loaded from API" }), updatedAt: new Date().toISOString() }
                 },
                 groups: {}
             }));
@@ -100,7 +100,7 @@ beforeAll(async () => {
     ></script>
 </head>
 <body>
-    <p data-editable="test-content">Default content</p>
+    <p data-scms-html="test-content">Default content</p>
 </body>
 </html>`);
             return;
@@ -188,11 +188,11 @@ test("content is fetched and populated correctly", async () => {
 
     // Wait for content to be populated
     await page.waitForFunction(() => {
-        const el = document.querySelector('[data-editable="test-content"]');
+        const el = document.querySelector('[data-scms-html="test-content"]');
         return el && el.textContent === "Loaded from API";
     });
 
-    const content = await page.locator('[data-editable="test-content"]').textContent();
+    const content = await page.locator('[data-scms-html="test-content"]').textContent();
     expect(content).toBe("Loaded from API");
 });
 
@@ -207,7 +207,7 @@ test("hiding styles are removed after content loads", async () => {
     expect(hidingStyles).toBeNull();
 
     // Verify content is visible
-    const contentEl = page.locator('[data-editable="test-content"]');
+    const contentEl = page.locator('[data-scms-html="test-content"]');
     const isVisible = await contentEl.isVisible();
     expect(isVisible).toBe(true);
 });

@@ -383,14 +383,14 @@
         </style>
     </head>
     <body>
-        <!-- Shared Header - uses data-group="header" -->
-        <header data-group="header">
+        <!-- Shared Header - uses data-scms-group="header" -->
+        <header data-scms-group="header">
             <div class="header-inner">
-                <div class="logo" data-editable="logo">StreamlinedCMS</div>
+                <div class="logo" data-scms-text="logo">StreamlinedCMS</div>
                 <nav class="nav-links">
-                    <a href="https://example.com/products" data-editable="nav-link-1" data-editable-type="link">Products</a>
-                    <a href="https://example.com/pricing" data-editable="nav-link-2" data-editable-type="link">Pricing</a>
-                    <a href="https://example.com/contact" data-editable="nav-link-3" data-editable-type="link">Contact</a>
+                    <a href="https://example.com/products" data-scms-link="nav-link-1">Products</a>
+                    <a href="https://example.com/pricing" data-scms-link="nav-link-2">Pricing</a>
+                    <a href="https://example.com/contact" data-scms-link="nav-link-3">Contact</a>
                 </nav>
             </div>
         </header>
@@ -409,10 +409,10 @@
                 <h3>Content Groups &amp; Link Editing Demo</h3>
                 <p>
                     This demo shows <strong>content groups</strong> and <strong>link editing</strong> in action.
-                    The header and footer are shared across all pages using <code>data-group</code>.
+                    The header and footer are shared across all pages using <code>data-scms-group</code>.
                 </p>
                 <p>
-                    <strong>Links:</strong> The nav links use <code>data-editable-type="link"</code>.
+                    <strong>Links:</strong> The nav links use <code>data-scms-link</code>.
                     Click to select, then use "Edit Link" to change URL/target, or double-click to navigate.
                 </p>
                 <p>
@@ -421,17 +421,17 @@
             </div>
 
             <!-- HOME PAGE -->
-            <div class="page active" id="page-home" data-group="home">
+            <div class="page active" id="page-home" data-scms-group="home">
                 <div class="hero">
-                    <h1 data-editable="hero-title">Welcome to Streamlined CMS</h1>
-                    <p class="tagline" data-editable="hero-tagline">
+                    <h1 data-scms-text="hero-title">Welcome to Streamlined CMS</h1>
+                    <p class="tagline" data-scms-text="hero-tagline">
                         Edit your website content inline, right where you see it.
                     </p>
                 </div>
 
                 <div class="content-section">
-                    <h2 data-editable="intro-heading">Simple, Fast, Powerful</h2>
-                    <p data-editable="intro-text">
+                    <h2 data-scms-text="intro-heading">Simple, Fast, Powerful</h2>
+                    <p data-scms-text="intro-text">
                         Streamlined CMS makes website editing as simple as clicking and typing. No
                         complex dashboards, no confusing admin panels. Just click on any text, edit it,
                         and save. Your changes go live instantly.
@@ -439,8 +439,8 @@
                 </div>
 
                 <div class="content-section">
-                    <h2 data-editable="cta-heading">Ready to Get Started?</h2>
-                    <p data-editable="cta-text">
+                    <h2 data-scms-text="cta-heading">Ready to Get Started?</h2>
+                    <p data-scms-text="cta-text">
                         Try editing any text on this page to see how easy it is. Sign in with your
                         account to enable editing mode. Changes you make are saved to the cloud and
                         appear for all visitors.
@@ -449,92 +449,89 @@
             </div>
 
             <!-- ABOUT PAGE -->
-            <div class="page" id="page-about" data-group="about">
+            <div class="page" id="page-about" data-scms-group="about">
                 <div class="content-section">
-                    <h2 data-editable="about-heading">About Our Company</h2>
-                    <p data-editable="about-text-1">
+                    <h2 data-scms-text="about-heading">About Our Company</h2>
+                    <p data-scms-text="about-text-1">
                         We believe content management should be simple. That's why we built
                         Streamlined CMS - a tool that lets you edit your website content directly
                         on the page, without complex admin interfaces.
                     </p>
-                    <p data-editable="about-text-2">
+                    <p data-scms-text="about-text-2">
                         Founded in 2025, our mission is to make website editing accessible to
                         everyone, from small business owners to enterprise teams.
                     </p>
                 </div>
 
                 <div class="content-section">
-                    <h2 data-editable="team-heading">Our Team</h2>
-                    <p data-editable="team-intro">
+                    <h2 data-scms-text="team-heading">Our Team</h2>
+                    <p data-scms-text="team-intro">
                         Meet the people behind Streamlined CMS.
                     </p>
                     <div class="team-grid">
                         <div class="team-member">
                             <img
-                                data-editable="team-photo-1"
-                                data-editable-type="image"
+                                data-scms-image="team-photo-1"
                                 src="https://placehold.co/120x120?text=CEO"
                                 alt="Team member"
                             />
-                            <h4 data-editable="team-name-1">Alex Chen</h4>
-                            <p class="role" data-editable="team-role-1">CEO & Founder</p>
+                            <h4 data-scms-text="team-name-1">Alex Chen</h4>
+                            <p class="role" data-scms-text="team-role-1">CEO & Founder</p>
                         </div>
                         <div class="team-member">
                             <img
-                                data-editable="team-photo-2"
-                                data-editable-type="image"
+                                data-scms-image="team-photo-2"
                                 src="https://placehold.co/120x120?text=CTO"
                                 alt="Team member"
                             />
-                            <h4 data-editable="team-name-2">Sam Rivera</h4>
-                            <p class="role" data-editable="team-role-2">CTO</p>
+                            <h4 data-scms-text="team-name-2">Sam Rivera</h4>
+                            <p class="role" data-scms-text="team-role-2">CTO</p>
                         </div>
                         <div class="team-member">
                             <img
-                                data-editable="team-photo-3"
-                                data-editable-type="image"
+                                data-scms-image="team-photo-3"
                                 src="https://placehold.co/120x120?text=Design"
                                 alt="Team member"
                             />
-                            <h4 data-editable="team-name-3">Jordan Lee</h4>
-                            <p class="role" data-editable="team-role-3">Head of Design</p>
+                            <h4 data-scms-text="team-name-3">Jordan Lee</h4>
+                            <p class="role" data-scms-text="team-role-3">Head of Design</p>
                         </div>
                     </div>
                 </div>
             </div>
 
             <!-- FEATURES PAGE -->
-            <div class="page" id="page-features" data-group="features">
+            <div class="page" id="page-features" data-scms-group="features">
                 <div class="content-section">
-                    <h2 data-editable="features-heading">Platform Features</h2>
-                    <p data-editable="features-intro">
+                    <h2 data-scms-text="features-heading">Platform Features</h2>
+                    <p data-scms-text="features-intro">
                         Everything you need to manage your website content effectively.
                     </p>
                     <div class="features">
                         <div class="feature-card">
-                            <h3 data-editable="feature1-title">Inline Editing</h3>
-                            <p data-editable="feature1-desc">
+                            <h3 data-scms-text="feature1-title">Inline Editing</h3>
+                            <p data-scms-text="feature1-desc">
                                 Edit content directly on your live website. No switching between
                                 preview and edit modes. What you see is what you get.
                             </p>
                         </div>
                         <div class="feature-card">
-                            <h3 data-editable="feature2-title">Lightning Fast</h3>
-                            <p data-editable="feature2-desc">
+                            <h3 data-scms-text="feature2-title">Lightning Fast</h3>
+                            <p data-scms-text="feature2-desc">
                                 Built on edge technology for instant updates worldwide. Changes
                                 appear in milliseconds, not minutes.
                             </p>
                         </div>
                         <div class="feature-card">
-                            <h3 data-editable="feature3-title">Simple Integration</h3>
-                            <p data-editable="feature3-desc">
+                            <h3 data-scms-text="feature3-title">Simple Integration</h3>
+                            <p data-scms-text="feature3-desc">
                                 Add one script tag to your website and you're ready to go. Works
                                 with any static site, CMS, or framework.
                             </p>
                         </div>
                         <div class="feature-card">
-                            <h3 data-editable="feature4-title">Content Groups</h3>
-                            <p data-editable="feature4-desc">
+                            <h3 data-scms-text="feature4-title">Content Groups</h3>
+                            <p data-scms-text="feature4-desc">
                                 Organize content into logical groups like headers and footers.
                                 Edit once, update everywhere across your site.
                             </p>
@@ -543,15 +540,14 @@
                 </div>
 
                 <div class="content-section">
-                    <h2 data-editable="media-heading">Media Management</h2>
-                    <p data-editable="media-text">
+                    <h2 data-scms-text="media-heading">Media Management</h2>
+                    <p data-scms-text="media-text">
                         Upload and manage images directly from the editor. Click the image below
                         to see it in action:
                     </p>
                     <div class="media-demo">
                         <img
-                            data-editable="demo-image"
-                            data-editable-type="image"
+                            data-scms-image="demo-image"
                             src="https://placehold.co/500x300?text=Click+to+Edit"
                             alt="Demo image"
                         />
@@ -560,32 +556,32 @@
             </div>
         </div>
 
-        <!-- Shared Footer - uses data-group="footer" -->
-        <footer data-group="footer">
+        <!-- Shared Footer - uses data-scms-group="footer" -->
+        <footer data-scms-group="footer">
             <div class="footer-inner">
                 <div class="footer-grid">
                     <div class="footer-section">
-                        <h4 data-editable="footer-col1-title">Company</h4>
-                        <p data-editable="footer-col1-text">
+                        <h4 data-scms-text="footer-col1-title">Company</h4>
+                        <p data-scms-text="footer-col1-text">
                             Streamlined CMS helps teams manage website content with ease.
                             No complex dashboards, just click and edit.
                         </p>
                     </div>
                     <div class="footer-section">
-                        <h4 data-editable="footer-col2-title">Resources</h4>
-                        <p data-editable="footer-col2-link1">Documentation</p>
-                        <p data-editable="footer-col2-link2">API Reference</p>
-                        <p data-editable="footer-col2-link3">Support Center</p>
+                        <h4 data-scms-text="footer-col2-title">Resources</h4>
+                        <p data-scms-text="footer-col2-link1">Documentation</p>
+                        <p data-scms-text="footer-col2-link2">API Reference</p>
+                        <p data-scms-text="footer-col2-link3">Support Center</p>
                     </div>
                     <div class="footer-section">
-                        <h4 data-editable="footer-col3-title">Contact</h4>
-                        <p data-editable="footer-col3-email">hello@example.com</p>
-                        <p data-editable="footer-col3-phone">+1 (555) 123-4567</p>
+                        <h4 data-scms-text="footer-col3-title">Contact</h4>
+                        <p data-scms-text="footer-col3-email">hello@example.com</p>
+                        <p data-scms-text="footer-col3-phone">+1 (555) 123-4567</p>
                     </div>
                 </div>
                 <div class="footer-bottom">
                     <p>
-                        <span data-editable="copyright">&copy; 2025 Streamlined CMS</span>
+                        <span data-scms-html="copyright">&copy; 2025 Streamlined CMS</span>
                         &nbsp;|&nbsp;
                         <a href="#" data-scms-signin>Sign In</a>
                     </p>

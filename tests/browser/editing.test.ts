@@ -49,7 +49,7 @@ test("test page loads successfully", async () => {
     await page.waitForSelector(".streamlined-editable");
 
     // Verify test elements are visible
-    const testTitle = page.locator('[data-editable="test-title"]');
+    const testTitle = page.locator('[data-scms-html="test-title"]');
     const isVisible = await testTitle.isVisible();
     expect(isVisible).toBe(true);
 });
@@ -60,7 +60,7 @@ test("editable elements have visual indicators on hover", async () => {
     // Wait for SDK to initialize
     await page.waitForSelector(".streamlined-editable");
 
-    const testTitle = page.locator('[data-editable="test-title"]');
+    const testTitle = page.locator('[data-scms-html="test-title"]');
 
     // Hover over element
     await testTitle.hover();
@@ -76,7 +76,7 @@ test("user can click to edit content", async () => {
     // Wait for SDK to initialize (toolbar appears with mock auth)
     await page.waitForSelector("scms-toolbar");
 
-    const testTitle = page.locator('[data-editable="test-title"]');
+    const testTitle = page.locator('[data-scms-html="test-title"]');
 
     // Click to start editing
     await testTitle.click();
@@ -100,7 +100,7 @@ test("user can edit and save content", async () => {
     // Wait for SDK to initialize (toolbar appears with mock auth)
     await page.waitForSelector("scms-toolbar");
 
-    const testTitle = page.locator('[data-editable="test-title"]');
+    const testTitle = page.locator('[data-scms-html="test-title"]');
 
     // Click to start editing
     await testTitle.click();
@@ -116,7 +116,7 @@ test("user can edit and save content", async () => {
 
     // Wait for save to complete and element to be deselected
     await page.waitForFunction(() => {
-        const title = document.querySelector('[data-editable="test-title"]');
+        const title = document.querySelector('[data-scms-html="test-title"]');
         return title && !title.classList.contains("streamlined-editing");
     }, { timeout: 3000 });
 
@@ -124,7 +124,7 @@ test("user can edit and save content", async () => {
     await page.reload();
     await page.waitForSelector("scms-toolbar");
 
-    const reloadedTitle = page.locator('[data-editable="test-title"]');
+    const reloadedTitle = page.locator('[data-scms-html="test-title"]');
     const reloadedContent = await reloadedTitle.textContent();
     expect(reloadedContent).toContain(newContent);
 });
@@ -182,7 +182,7 @@ test("typed link content is parsed correctly (not shown as raw JSON)", async () 
     await page.goto(testUrl);
     await page.waitForSelector(".streamlined-editable");
 
-    const link = page.locator('[data-editable="test-link"]');
+    const link = page.locator('[data-scms-link="test-link"]');
 
     // Verify the link text is the parsed text, NOT the raw JSON
     const linkText = await link.textContent();
@@ -207,7 +207,7 @@ test("typed html content is parsed correctly", async () => {
     await page.goto(testUrl);
     await page.waitForSelector(".streamlined-editable");
 
-    const title = page.locator('[data-editable="test-title"]');
+    const title = page.locator('[data-scms-html="test-title"]');
     const innerHTML = await title.innerHTML();
 
     expect(innerHTML).toBe("<strong>Bold Title</strong>");
@@ -224,28 +224,14 @@ test("typed text content is parsed correctly", async () => {
     await page.goto(testUrl);
     await page.waitForSelector(".streamlined-editable");
 
-    const paragraph = page.locator('[data-editable="test-paragraph"]');
+    const paragraph = page.locator('[data-scms-html="test-paragraph"]');
     const textContent = await paragraph.textContent();
 
     expect(textContent).toBe("Plain text content");
     expect(textContent).not.toContain("{");
 });
 
-test("legacy content without type field still works", async () => {
-    server.clearContent();
-    // Legacy format: plain HTML string, not JSON
-    server.setContent("test-app", "test-heading", "<em>Legacy Content</em>");
-
-    await page.goto(testUrl);
-    await page.waitForSelector(".streamlined-editable");
-
-    const heading = page.locator('[data-editable="test-heading"]');
-    const innerHTML = await heading.innerHTML();
-
-    expect(innerHTML).toBe("<em>Legacy Content</em>");
-});
-
-test("legacy link format without type field is parsed correctly", async () => {
+test("JSON without type field uses element's declared type", async () => {
     server.clearContent();
     // Old link format: JSON with href/target/text but NO type field
     server.setContent("test-app", "test-link", JSON.stringify({
@@ -257,7 +243,7 @@ test("legacy link format without type field is parsed correctly", async () => {
     await page.goto(testUrl);
     await page.waitForSelector(".streamlined-editable");
 
-    const link = page.locator('[data-editable="test-link"]');
+    const link = page.locator('[data-scms-link="test-link"]');
 
     // This should NOT show raw JSON - the link should be parsed
     const linkText = await link.textContent();

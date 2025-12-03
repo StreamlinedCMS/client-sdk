@@ -35,7 +35,7 @@
     // Inject hiding styles immediately
     const style = document.createElement("style");
     style.id = "streamlined-cms-hiding";
-    style.textContent = "[data-editable]{visibility:hidden}";
+    style.textContent = "[data-scms-text],[data-scms-html],[data-scms-image],[data-scms-link]{visibility:hidden}";
     document.head.appendChild(style);
 
     // Determine ESM bundle URL (same directory as loader)
@@ -65,27 +65,45 @@
     }
 
     /**
-     * Element info including optional group
+     * Editable element types
+     */
+    type EditableType = "text" | "html" | "image" | "link";
+
+    /**
+     * Element info including optional group and type
      */
     interface EditableElementInfo {
         element: HTMLElement;
         groupId: string | null;
+        type: EditableType;
     }
 
     /**
-     * Get group ID for an element by checking data-group on self or ancestors
+     * Get group ID for an element by checking data-scms-group on self or ancestors
      */
     function getGroupId(element: HTMLElement): string | null {
         // First check the element itself
-        const selfGroup = element.getAttribute("data-group");
+        const selfGroup = element.getAttribute("data-scms-group");
         if (selfGroup) return selfGroup;
 
-        // Walk up to find nearest ancestor with data-group
+        // Walk up to find nearest ancestor with data-scms-group
         let parent = element.parentElement;
         while (parent) {
-            const parentGroup = parent.getAttribute("data-group");
+            const parentGroup = parent.getAttribute("data-scms-group");
             if (parentGroup) return parentGroup;
             parent = parent.parentElement;
+        }
+        return null;
+    }
+
+    /**
+     * Get editable info from element by checking data-scms-{type} attributes
+     */
+    function getEditableInfo(element: HTMLElement): { id: string; type: EditableType } | null {
+        const types: EditableType[] = ["text", "html", "image", "link"];
+        for (const type of types) {
+            const id = element.getAttribute(`data-scms-${type}`);
+            if (id) return { id, type };
         }
         return null;
     }
@@ -95,13 +113,14 @@
      */
     function scanEditableElements(): Map<string, EditableElementInfo> {
         const elements = new Map<string, EditableElementInfo>();
-        document.querySelectorAll<HTMLElement>("[data-editable]").forEach((element) => {
-            const elementId = element.getAttribute("data-editable");
-            if (elementId) {
+        const selector = "[data-scms-text], [data-scms-html], [data-scms-image], [data-scms-link]";
+        document.querySelectorAll<HTMLElement>(selector).forEach((element) => {
+            const info = getEditableInfo(element);
+            if (info) {
                 const groupId = getGroupId(element);
                 // Use composite key for grouped elements: groupId:elementId
-                const key = groupId ? `${groupId}:${elementId}` : elementId;
-                elements.set(key, { element, groupId });
+                const key = groupId ? `${groupId}:${info.id}` : info.id;
+                elements.set(key, { element, groupId, type: info.type });
             }
         });
         return elements;
@@ -110,7 +129,6 @@
     /**
      * Update a single element with content
      * Handles typed JSON format: { type: "text"|"html"|"image"|"link", ... }
-     * Falls back to innerHTML for legacy content without type field
      */
     function updateElement(
         elements: Map<string, EditableElementInfo>,
@@ -142,7 +160,7 @@
                 }
                 newImg.src = src;
                 element.replaceWith(newImg);
-                elements.set(key, { element: newImg, groupId: info.groupId });
+                elements.set(key, { element: newImg, groupId: info.groupId, type: info.type });
                 return;
             } else if (data.type === "link" && element instanceof HTMLAnchorElement) {
                 const linkData = data as { type: "link"; href: string; target: string; text: string };
@@ -154,9 +172,8 @@
                 // Unknown type with type field - don't process
                 return;
             }
-            // No type field - infer type from element attribute and re-process
-            const attrType = element.getAttribute("data-editable-type");
-            if (attrType === "link" && element instanceof HTMLAnchorElement) {
+            // No type field in JSON - use element's declared type
+            if (info.type === "link" && element instanceof HTMLAnchorElement) {
                 const linkData = data as { href?: string; target?: string; text?: string };
                 if (linkData.href !== undefined) {
                     element.href = linkData.href;
@@ -164,7 +181,7 @@
                     element.textContent = linkData.text || "";
                     return;
                 }
-            } else if (attrType === "image" && element instanceof HTMLImageElement) {
+            } else if (info.type === "image" && element instanceof HTMLImageElement) {
                 const imageData = data as { src?: string };
                 if (imageData.src !== undefined) {
                     const newImg = document.createElement("img");
@@ -174,42 +191,24 @@
                     }
                     newImg.src = imageData.src;
                     element.replaceWith(newImg);
-                    elements.set(key, { element: newImg, groupId: info.groupId });
+                    elements.set(key, { element: newImg, groupId: info.groupId, type: info.type });
                     return;
                 }
-            } else if (attrType === "text") {
+            } else if (info.type === "text") {
                 const textData = data as { value?: string };
                 if (textData.value !== undefined) {
                     element.textContent = textData.value;
                     return;
                 }
-            } else if (attrType === "html") {
+            } else if (info.type === "html") {
                 const htmlData = data as { value?: string };
                 if (htmlData.value !== undefined) {
                     element.innerHTML = htmlData.value;
                     return;
                 }
             }
-            // Unrecognized JSON structure - fall through to legacy handling
         } catch {
-            // Not JSON - fall through to legacy handling
-        }
-
-        // Legacy content handling (plain string, not JSON)
-        const isImage =
-            element.tagName === "IMG" ||
-            element.getAttribute("data-editable-type") === "image";
-        if (isImage && element instanceof HTMLImageElement) {
-            const newImg = document.createElement("img");
-            for (let i = 0; i < element.attributes.length; i++) {
-                const attr = element.attributes[i];
-                newImg.setAttribute(attr.name, attr.value);
-            }
-            newImg.src = content;
-            element.replaceWith(newImg);
-            elements.set(key, { element: newImg, groupId: info.groupId });
-        } else {
-            element.innerHTML = content;
+            // Not JSON - ignore, content should always be JSON
         }
     }
 
