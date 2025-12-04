@@ -137,7 +137,9 @@ export class TestServer {
         }
 
         // Match: /apps/{appId}/content/groups/{groupId}/elements/{elementId} (grouped)
-        const groupedMatch = pathname.match(/^\/apps\/([^/]+)\/content\/groups\/([^/]+)\/elements\/([^/]+)$/);
+        const groupedMatch = pathname.match(
+            /^\/apps\/([^/]+)\/content\/groups\/([^/]+)\/elements\/([^/]+)$/,
+        );
         if (groupedMatch) {
             const appId = groupedMatch[1];
             const groupId = groupedMatch[2];

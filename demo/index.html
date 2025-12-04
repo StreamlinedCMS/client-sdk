@@ -126,7 +126,10 @@
                 font-size: 0.95em;
                 color: #666;
                 border-bottom: 3px solid transparent;
-                transition: color 0.15s, border-color 0.15s, background-color 0.15s;
+                transition:
+                    color 0.15s,
+                    border-color 0.15s,
+                    background-color 0.15s;
                 white-space: nowrap;
             }
 
@@ -318,7 +321,9 @@
                 background: white;
                 border-radius: 6px;
                 border: 1px solid #e5e7eb;
-                transition: background-color 0.2s, border-color 0.2s;
+                transition:
+                    background-color 0.2s,
+                    border-color 0.2s;
             }
 
             .link-demo a:hover {
@@ -503,11 +508,13 @@
                 <div class="info-box">
                     <h3>Text Editing</h3>
                     <p>
-                        Use <code>data-scms-text="element-id"</code> for simple text content.
-                        Click any text element to edit it inline. Perfect for headings, paragraphs, and labels.
+                        Use <code>data-scms-text="element-id"</code> for simple text content. Click
+                        any text element to edit it inline. Perfect for headings, paragraphs, and
+                        labels.
                     </p>
                     <p>
-                        <a href="#" data-scms-signin>Sign in</a> to enable editing mode, then click any outlined element below.
+                        <a href="#" data-scms-signin>Sign in</a> to enable editing mode, then click
+                        any outlined element below.
                     </p>
                 </div>
 
@@ -516,9 +523,9 @@
                         <h3>Editable Text Examples</h3>
                         <h2 data-scms-text="text-demo-heading">This Heading is Editable</h2>
                         <p data-scms-text="text-demo-paragraph">
-                            This paragraph can be edited by clicking on it. The text you enter will be
-                            saved and displayed to all visitors. Try changing this text to see how
-                            simple inline editing works.
+                            This paragraph can be edited by clicking on it. The text you enter will
+                            be saved and displayed to all visitors. Try changing this text to see
+                            how simple inline editing works.
                         </p>
                         <p data-scms-text="text-demo-paragraph-2">
                             Here's another paragraph you can edit. Each element has a unique ID so
@@ -533,11 +540,12 @@
                 <div class="info-box">
                     <h3>HTML Editing</h3>
                     <p>
-                        Use <code>data-scms-html="element-id"</code> for rich HTML content.
-                        When selected, use the "Edit HTML" button in the toolbar to open a code editor.
+                        Use <code>data-scms-html="element-id"</code> for rich HTML content. When
+                        selected, use the "Edit HTML" button in the toolbar to open a code editor.
                     </p>
                     <p>
-                        This is useful for content that needs formatting like bold, italic, lists, or embedded elements.
+                        This is useful for content that needs formatting like bold, italic, lists,
+                        or embedded elements.
                     </p>
                 </div>
 
@@ -545,13 +553,19 @@
                     <div class="demo-area">
                         <h3>Editable HTML Example</h3>
                         <div data-scms-html="html-demo-content">
-                            <p>This content supports <strong>bold</strong>, <em>italic</em>, and other HTML formatting.</p>
+                            <p>
+                                This content supports <strong>bold</strong>, <em>italic</em>, and
+                                other HTML formatting.
+                            </p>
                             <ul>
                                 <li>List item one</li>
                                 <li>List item two</li>
                                 <li>List item three</li>
                             </ul>
-                            <p>Select this element and click <strong>Edit HTML</strong> in the toolbar to modify the source.</p>
+                            <p>
+                                Select this element and click <strong>Edit HTML</strong> in the
+                                toolbar to modify the source.
+                            </p>
                         </div>
                     </div>
                 </div>
@@ -562,12 +576,11 @@
                 <div class="info-box">
                     <h3>Image Editing</h3>
                     <p>
-                        Use <code>data-scms-image="element-id"</code> on <code>&lt;img&gt;</code> tags.
-                        Click to select, then use "Change Image" or double-click to open the media manager.
+                        Use <code>data-scms-image="element-id"</code> on
+                        <code>&lt;img&gt;</code> tags. Click to select, then use "Change Image" or
+                        double-click to open the media manager.
                     </p>
-                    <p>
-                        Images are uploaded to cloud storage and served via CDN for fast loading.
-                    </p>
+                    <p>Images are uploaded to cloud storage and served via CDN for fast loading.</p>
                 </div>
 
                 <div class="content-section">
@@ -602,22 +615,27 @@
                         Use <code>data-scms-link="element-id"</code> on <code>&lt;a&gt;</code> tags.
                         Click to select, then use "Edit Link" to change the URL, text, and target.
                     </p>
-                    <p>
-                        Double-click a link to navigate to it (useful for testing).
-                    </p>
+                    <p>Double-click a link to navigate to it (useful for testing).</p>
                 </div>
 
                 <div class="content-section">
                     <div class="demo-area">
                         <h3>Editable Links</h3>
                         <div class="link-demo">
-                            <a href="https://example.com/getting-started" data-scms-link="link-demo-1">
+                            <a
+                                href="https://example.com/getting-started"
+                                data-scms-link="link-demo-1"
+                            >
                                 Getting Started Guide
                             </a>
                             <a href="https://example.com/api-docs" data-scms-link="link-demo-2">
                                 API Documentation
                             </a>
-                            <a href="https://example.com/tutorials" data-scms-link="link-demo-3" target="_blank">
+                            <a
+                                href="https://example.com/tutorials"
+                                data-scms-link="link-demo-3"
+                                target="_blank"
+                            >
                                 Video Tutorials (opens in new tab)
                             </a>
                         </div>
@@ -630,15 +648,20 @@
                 <div class="info-box">
                     <h3>Content Groups</h3>
                     <p>
-                        Use <code>data-scms-group="group-id"</code> on a container to group related content.
-                        Elements in a group share their content across all pages that use the same group.
+                        Use <code>data-scms-group="group-id"</code> on a container to group related
+                        content. Elements in a group share their content across all pages that use
+                        the same group.
                     </p>
-                    <p>
-                        Perfect for headers, footers, and sidebars that appear on multiple pages.
-                    </p>
+                    <p>Perfect for headers, footers, and sidebars that appear on multiple pages.</p>
                     <ul>
-                        <li>The <strong>header</strong> above uses <code>data-scms-group="header"</code></li>
-                        <li>The <strong>footer</strong> below uses <code>data-scms-group="footer"</code></li>
+                        <li>
+                            The <strong>header</strong> above uses
+                            <code>data-scms-group="header"</code>
+                        </li>
+                        <li>
+                            The <strong>footer</strong> below uses
+                            <code>data-scms-group="footer"</code>
+                        </li>
                         <li>Edit them on any page and changes appear everywhere</li>
                     </ul>
                 </div>
@@ -646,8 +669,8 @@
                 <div class="content-section">
                     <h2>How Groups Work</h2>
                     <p>
-                        Without groups, each page would have its own copy of the header and footer content.
-                        With groups, they share a single source of truth.
+                        Without groups, each page would have its own copy of the header and footer
+                        content. With groups, they share a single source of truth.
                     </p>
                     <p>
                         Try editing the logo or navigation links in the header - the changes will
@@ -657,8 +680,8 @@
                     <div class="demo-area">
                         <h3>Page-Specific Content (Not Grouped)</h3>
                         <p data-scms-text="groups-page-content">
-                            This paragraph is NOT in a group. It only exists on this page.
-                            Each page can have its own unique content alongside shared group content.
+                            This paragraph is NOT in a group. It only exists on this page. Each page
+                            can have its own unique content alongside shared group content.
                         </p>
                     </div>
                 </div>
@@ -666,19 +689,21 @@
                 <div class="content-section">
                     <h2>Groups Inside Templates</h2>
                     <p>
-                        Groups can also be used inside repeating templates. When you edit a grouped element
-                        in one template instance, it updates in all instances automatically.
+                        Groups can also be used inside repeating templates. When you edit a grouped
+                        element in one template instance, it updates in all instances automatically.
                     </p>
                     <p>
                         The product cards below each have a promotional banner that uses
-                        <code>data-scms-group="promo-banner"</code>. Edit the banner text on any card
-                        and watch it update on all of them.
+                        <code>data-scms-group="promo-banner"</code>. Edit the banner text on any
+                        card and watch it update on all of them.
                     </p>
 
                     <div class="product-grid" data-scms-template="product-card">
                         <div class="product-card">
                             <div class="promo-banner" data-scms-group="promo-banner">
-                                <span data-scms-text="promo-text">Free Shipping on Orders $50+</span>
+                                <span data-scms-text="promo-text"
+                                    >Free Shipping on Orders $50+</span
+                                >
                             </div>
                             <img
                                 data-scms-image="product-image"
@@ -731,12 +756,15 @@
                 <div class="info-box">
                     <h3>Element Attributes</h3>
                     <p>
-                        Beyond content, you can edit SEO, accessibility, and custom attributes on any element.
-                        Select an element and use the toolbar's "More" menu to access:
+                        Beyond content, you can edit SEO, accessibility, and custom attributes on
+                        any element. Select an element and use the toolbar's "More" menu to access:
                     </p>
                     <ul>
                         <li><strong>SEO:</strong> alt text, title, rel attributes</li>
-                        <li><strong>Accessibility:</strong> aria-label, aria-describedby, role, tabindex</li>
+                        <li>
+                            <strong>Accessibility:</strong> aria-label, aria-describedby, role,
+                            tabindex
+                        </li>
                         <li><strong>Custom:</strong> data-* attributes, classes, and more</li>
                     </ul>
                 </div>
@@ -747,7 +775,9 @@
                     <div class="attributes-demo">
                         <div class="attribute-example">
                             <h4>Image with SEO Attributes</h4>
-                            <p>Select this image and open SEO settings to edit alt text and title.</p>
+                            <p>
+                                Select this image and open SEO settings to edit alt text and title.
+                            </p>
                             <img
                                 data-scms-image="attr-demo-image"
                                 src="https://placehold.co/200x150/f59e0b/white?text=Product"
@@ -758,16 +788,28 @@
 
                         <div class="attribute-example">
                             <h4>Link with Accessibility</h4>
-                            <p>Select this link and open accessibility settings to edit aria-label.</p>
-                            <a href="https://example.com/help" data-scms-link="attr-demo-link" aria-label="Get help and support" aria-describedby="help-description">
+                            <p>
+                                Select this link and open accessibility settings to edit aria-label.
+                            </p>
+                            <a
+                                href="https://example.com/help"
+                                data-scms-link="attr-demo-link"
+                                aria-label="Get help and support"
+                                aria-describedby="help-description"
+                            >
                                 Need help?
                             </a>
-                            <span id="help-description" class="sr-only">Opens our help center with FAQs and contact options</span>
+                            <span id="help-description" class="sr-only"
+                                >Opens our help center with FAQs and contact options</span
+                            >
                         </div>
 
                         <div class="attribute-example">
                             <h4>Text with Custom Attributes</h4>
-                            <p>Select this text and open custom attributes to add data-* attributes.</p>
+                            <p>
+                                Select this text and open custom attributes to add data-*
+                                attributes.
+                            </p>
                             <p data-scms-text="attr-demo-text">
                                 This text element can have custom attributes added for analytics,
                                 A/B testing, or integration with other tools.
@@ -785,8 +827,8 @@
                     <div class="footer-section">
                         <h4 data-scms-text="footer-col1-title">StreamlinedCMS</h4>
                         <p data-scms-text="footer-col1-text">
-                            Edit your website content inline, right where you see it.
-                            No complex dashboards required.
+                            Edit your website content inline, right where you see it. No complex
+                            dashboards required.
                         </p>
                     </div>
                     <div class="footer-section">
@@ -813,9 +855,9 @@
 
         <!-- Tab switching with URL hash support -->
         <script>
-            (function() {
-                const tabs = document.querySelectorAll('.page-tab');
-                const pages = document.querySelectorAll('.page');
+            (function () {
+                const tabs = document.querySelectorAll(".page-tab");
+                const pages = document.querySelectorAll(".page");
                 let currentPage = null;
 
                 function showPage(pageId, updateHash) {
@@ -824,44 +866,44 @@
                     currentPage = pageId;
 
                     // Update tabs
-                    tabs.forEach(tab => {
-                        tab.classList.toggle('active', tab.getAttribute('data-page') === pageId);
+                    tabs.forEach((tab) => {
+                        tab.classList.toggle("active", tab.getAttribute("data-page") === pageId);
                     });
 
                     // Update pages
-                    pages.forEach(page => {
-                        page.classList.toggle('active', page.id === 'page-' + pageId);
+                    pages.forEach((page) => {
+                        page.classList.toggle("active", page.id === "page-" + pageId);
                     });
 
                     // Update URL hash if requested
                     if (updateHash) {
-                        history.replaceState(null, '', '#' + pageId);
+                        history.replaceState(null, "", "#" + pageId);
                     }
                 }
 
                 function getPageFromHash() {
                     const hash = window.location.hash.slice(1);
                     // Validate that this is a real page
-                    const validPages = Array.from(tabs).map(t => t.getAttribute('data-page'));
-                    return validPages.includes(hash) ? hash : 'text';
+                    const validPages = Array.from(tabs).map((t) => t.getAttribute("data-page"));
+                    return validPages.includes(hash) ? hash : "text";
                 }
 
                 // Handle tab clicks
-                tabs.forEach(tab => {
-                    tab.addEventListener('click', () => {
-                        const pageId = tab.getAttribute('data-page');
+                tabs.forEach((tab) => {
+                    tab.addEventListener("click", () => {
+                        const pageId = tab.getAttribute("data-page");
                         showPage(pageId, true);
                     });
                 });
 
                 // Handle browser back/forward
-                window.addEventListener('hashchange', () => {
+                window.addEventListener("hashchange", () => {
                     showPage(getPageFromHash(), false);
                 });
 
                 // Set initial page from URL hash
                 const initialPage = getPageFromHash();
-                showPage(initialPage, window.location.hash === '');
+                showPage(initialPage, window.location.hash === "");
             })();
         </script>
     </body>

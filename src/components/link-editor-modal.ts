@@ -64,7 +64,8 @@ export class LinkEditorModal extends LitElement {
                 flex-direction: column;
             }
 
-            input, select {
+            input,
+            select {
                 font-size: 14px;
             }
 
@@ -123,7 +124,7 @@ export class LinkEditorModal extends LitElement {
                 },
                 bubbles: true,
                 composed: true,
-            })
+            }),
         );
     }
 
@@ -138,7 +139,7 @@ export class LinkEditorModal extends LitElement {
             new CustomEvent("cancel", {
                 bubbles: true,
                 composed: true,
-            })
+            }),
         );
     }
 
@@ -176,7 +177,9 @@ export class LinkEditorModal extends LitElement {
                 <div class="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
                     <div class="flex items-center gap-2">
                         <span class="text-sm font-medium text-gray-900">Edit Link</span>
-                        <span class="text-xs font-mono text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+                        <span
+                            class="text-xs font-mono text-gray-500 bg-gray-100 px-2 py-0.5 rounded"
+                        >
                             ${this.elementId}
                         </span>
                     </div>
@@ -214,9 +217,7 @@ export class LinkEditorModal extends LitElement {
 
                     <!-- URL -->
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">
-                            URL
-                        </label>
+                        <label class="block text-sm font-medium text-gray-700 mb-1"> URL </label>
                         <input
                             type="url"
                             class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400"
@@ -244,7 +245,9 @@ export class LinkEditorModal extends LitElement {
                 </div>
 
                 <!-- Footer -->
-                <div class="px-4 py-3 border-t border-gray-200 flex items-center justify-between bg-gray-50">
+                <div
+                    class="px-4 py-3 border-t border-gray-200 flex items-center justify-between bg-gray-50"
+                >
                     <span class="text-xs text-gray-500">
                         <kbd class="px-1.5 py-0.5 bg-gray-200 rounded text-gray-600">⌘</kbd>
                         <kbd class="px-1.5 py-0.5 bg-gray-200 rounded text-gray-600">Enter</kbd>

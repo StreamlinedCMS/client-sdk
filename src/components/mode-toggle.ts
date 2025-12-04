@@ -30,7 +30,7 @@ export class ModeToggle extends LitElement {
                     detail: { mode: newMode },
                     bubbles: true,
                     composed: true,
-                })
+                }),
             );
         }
     }
@@ -52,13 +52,17 @@ export class ModeToggle extends LitElement {
                     style=${styleMap(sliderStyles)}
                 ></div>
                 <button
-                    class="${baseButtonClasses} ${isViewer ? "text-gray-900" : "text-gray-500 hover:text-gray-700"}"
+                    class="${baseButtonClasses} ${isViewer
+                        ? "text-gray-900"
+                        : "text-gray-500 hover:text-gray-700"}"
                     @click=${() => this.handleModeChange("viewer")}
                 >
                     Viewer
                 </button>
                 <button
-                    class="${baseButtonClasses} ${!isViewer ? "text-gray-900" : "text-gray-500 hover:text-gray-700"}"
+                    class="${baseButtonClasses} ${!isViewer
+                        ? "text-gray-900"
+                        : "text-gray-500 hover:text-gray-700"}"
                     @click=${() => this.handleModeChange("author")}
                 >
                     Author

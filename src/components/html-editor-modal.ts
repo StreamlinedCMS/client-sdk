@@ -54,8 +54,9 @@ export class HtmlEditorModal extends LitElement {
             }
 
             textarea {
-                font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
-                    "Liberation Mono", monospace;
+                font-family:
+                    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono",
+                    monospace;
                 font-size: 13px;
                 line-height: 1.5;
                 tab-size: 2;
@@ -96,7 +97,7 @@ export class HtmlEditorModal extends LitElement {
                 detail: { content: this.editedContent },
                 bubbles: true,
                 composed: true,
-            })
+            }),
         );
     }
 
@@ -111,7 +112,7 @@ export class HtmlEditorModal extends LitElement {
             new CustomEvent("cancel", {
                 bubbles: true,
                 composed: true,
-            })
+            }),
         );
     }
 
@@ -145,7 +146,9 @@ export class HtmlEditorModal extends LitElement {
                 <div class="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
                     <div class="flex items-center gap-2">
                         <span class="text-sm font-medium text-gray-900">Edit HTML</span>
-                        <span class="text-xs font-mono text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+                        <span
+                            class="text-xs font-mono text-gray-500 bg-gray-100 px-2 py-0.5 rounded"
+                        >
                             ${this.elementId}
                         </span>
                     </div>
@@ -177,7 +180,9 @@ export class HtmlEditorModal extends LitElement {
                 </div>
 
                 <!-- Footer -->
-                <div class="px-4 py-3 border-t border-gray-200 flex items-center justify-between bg-gray-50">
+                <div
+                    class="px-4 py-3 border-t border-gray-200 flex items-center justify-between bg-gray-50"
+                >
                     <span class="text-xs text-gray-500">
                         <kbd class="px-1.5 py-0.5 bg-gray-200 rounded text-gray-600">⌘</kbd>
                         <kbd class="px-1.5 py-0.5 bg-gray-200 rounded text-gray-600">Enter</kbd>

@@ -20,8 +20,8 @@
     "test:watch": "vitest",
     "test:browser:watch": "vitest tests/browser",
     "test:coverage": "vitest run --coverage",
-    "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.{ts,html}\" \"demo/**/*.{html,css,js}\"",
-    "format:check": "prettier --check \"src/**/*.ts\" \"tests/**/*.{ts,html}\" \"demo/**/*.{html,css,js}\""
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "author": "Matthew Brisebois",
   "license": "LGPL-3.0",

@@ -35,7 +35,8 @@
     // Inject hiding styles immediately
     const style = document.createElement("style");
     style.id = "streamlined-cms-hiding";
-    style.textContent = "[data-scms-text],[data-scms-html],[data-scms-image],[data-scms-link]{visibility:hidden}";
+    style.textContent =
+        "[data-scms-text],[data-scms-html],[data-scms-image],[data-scms-link]{visibility:hidden}";
     document.head.appendChild(style);
 
     // Determine ESM bundle URL (same directory as loader)
@@ -154,7 +155,9 @@
                 return data.filter((id): id is string => typeof id === "string");
             }
             if (data.type === "order" && Array.isArray(data.value)) {
-                return (data.value as unknown[]).filter((id): id is string => typeof id === "string");
+                return (data.value as unknown[]).filter(
+                    (id): id is string => typeof id === "string",
+                );
             }
         } catch {
             // Invalid JSON
@@ -248,7 +251,7 @@
                 templateCount++;
                 if (templateCount > 1) {
                     console.warn(
-                        `[StreamlinedCMS] Nested templates detected. Inner template "${current.getAttribute("data-scms-template")}" will be ignored.`
+                        `[StreamlinedCMS] Nested templates detected. Inner template "${current.getAttribute("data-scms-template")}" will be ignored.`,
                     );
                     return true;
                 }
@@ -273,14 +276,16 @@
             // Warn if templateId contains a dot
             if (templateId.includes(".")) {
                 console.warn(
-                    `[StreamlinedCMS] Template ID "${templateId}" contains a dot. Dots are reserved for template instance separators.`
+                    `[StreamlinedCMS] Template ID "${templateId}" contains a dot. Dots are reserved for template instance separators.`,
                 );
             }
 
             // Get the first child element as the template definition
             const templateElement = container.firstElementChild as HTMLElement | null;
             if (!templateElement) {
-                console.warn(`[StreamlinedCMS] Template "${templateId}" has no child elements to use as template.`);
+                console.warn(
+                    `[StreamlinedCMS] Template "${templateId}" has no child elements to use as template.`,
+                );
                 return;
             }
 
@@ -315,7 +320,7 @@
     function warnIfDotInElementId(elementId: string): void {
         if (elementId.includes(".")) {
             console.warn(
-                `[StreamlinedCMS] Element ID "${elementId}" contains a dot. Dots are reserved for template instance separators.`
+                `[StreamlinedCMS] Element ID "${elementId}" contains a dot. Dots are reserved for template instance separators.`,
             );
         }
     }
@@ -381,7 +386,7 @@
     function getTemplateInstanceIds(
         data: ContentResponse,
         templateId: string,
-        groupId?: string
+        groupId?: string,
     ): string[] {
         // First, try to get order from the _order key
         const orderKey = getOrderKey(templateId);
@@ -434,7 +439,7 @@
      */
     function cloneTemplateInstances(
         templates: Map<string, TemplateInfo>,
-        data: ContentResponse
+        data: ContentResponse,
     ): void {
         templates.forEach((templateInfo) => {
             const { templateId, container, templateElement } = templateInfo;
@@ -478,7 +483,7 @@
     function applyContentToElement(
         element: HTMLElement,
         type: EditableType,
-        content: string
+        content: string,
     ): HTMLElement {
         try {
             const data = JSON.parse(content) as { type?: string };
@@ -500,7 +505,12 @@
                 element.replaceWith(newImg);
                 return newImg;
             } else if (data.type === "link" && element instanceof HTMLAnchorElement) {
-                const linkData = data as { type: "link"; href: string; target: string; text: string };
+                const linkData = data as {
+                    type: "link";
+                    href: string;
+                    target: string;
+                    text: string;
+                };
                 element.href = linkData.href;
                 element.target = linkData.target;
                 element.textContent = linkData.text;
@@ -553,7 +563,7 @@
     function updateElements(
         elements: Map<string, EditableElementInfo[]>,
         key: string,
-        content: string
+        content: string,
     ): void {
         const infos = elements.get(key);
         if (!infos) return;
@@ -577,7 +587,7 @@
         data: {
             elements: Record<string, { content: string }>;
             groups: Record<string, { elements: Record<string, { content: string }> }>;
-        }
+        },
     ): void {
         // Populate ungrouped elements
         Object.entries(data.elements).forEach(([elementId, element]) => {
@@ -629,7 +639,7 @@
                 throw new Error(`Failed to load content: ${response.status}`);
             }
 
-            return await response.json() as ContentResponse;
+            return (await response.json()) as ContentResponse;
         } catch (error) {
             console.warn("[StreamlinedCMS] Could not load content:", error);
             return null;

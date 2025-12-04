@@ -2,7 +2,7 @@
  * Log level options (matches loganite levels)
  * fatal = silent, error, warn, normal, info, debug, trace
  */
-export type LogLevel = 'fatal' | 'error' | 'warn' | 'normal' | 'info' | 'debug' | 'trace';
+export type LogLevel = "fatal" | "error" | "warn" | "normal" | "info" | "debug" | "trace";
 
 /**
  * Log level input options (accepts false/null which normalize to 'fatal')
@@ -89,7 +89,7 @@ export interface SaveResponse {
 /**
  * Editable element types
  */
-export type EditableType = 'text' | 'html' | 'image' | 'link';
+export type EditableType = "text" | "html" | "image" | "link";
 
 /**
  * Element attributes (applied as HTML attributes)
@@ -108,22 +108,22 @@ interface BaseContentData {
  * Content data structures (stored as JSON in content field)
  */
 export interface TextContentData extends BaseContentData {
-    type: 'text';
+    type: "text";
     value: string;
 }
 
 export interface HtmlContentData extends BaseContentData {
-    type: 'html';
+    type: "html";
     value: string;
 }
 
 export interface ImageContentData extends BaseContentData {
-    type: 'image';
+    type: "image";
     src: string;
 }
 
 export interface LinkContentData extends BaseContentData {
-    type: 'link';
+    type: "link";
     href: string;
     target: string;
     text: string;
@@ -163,10 +163,10 @@ export interface ParsedTemplateKey {
 export function parseTemplateKey(key: string): ParsedTemplateKey | null {
     // Template keys have format: templateId.instanceId.elementId
     // Need at least 3 parts separated by dots
-    const firstDot = key.indexOf('.');
+    const firstDot = key.indexOf(".");
     if (firstDot === -1) return null;
 
-    const secondDot = key.indexOf('.', firstDot + 1);
+    const secondDot = key.indexOf(".", firstDot + 1);
     if (secondDot === -1) return null;
 
     const templateId = key.slice(0, firstDot);
@@ -181,7 +181,11 @@ export function parseTemplateKey(key: string): ParsedTemplateKey | null {
 /**
  * Build a template element key from components
  */
-export function buildTemplateKey(templateId: string, instanceId: string, elementId: string): string {
+export function buildTemplateKey(
+    templateId: string,
+    instanceId: string,
+    elementId: string,
+): string {
     return `${templateId}.${instanceId}.${elementId}`;
 }
 
@@ -190,10 +194,10 @@ export function buildTemplateKey(templateId: string, instanceId: string, element
  * Uses crypto.getRandomValues for better randomness
  */
 export function generateInstanceId(): string {
-    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
     const array = new Uint8Array(5);
     crypto.getRandomValues(array);
-    return Array.from(array, (byte) => chars[byte % chars.length]).join('');
+    return Array.from(array, (byte) => chars[byte % chars.length]).join("");
 }
 
 /**
@@ -211,10 +215,10 @@ export function parseOrderArray(content: string): string[] {
     try {
         const data = JSON.parse(content);
         if (Array.isArray(data)) {
-            return data.filter((id): id is string => typeof id === 'string');
+            return data.filter((id): id is string => typeof id === "string");
         }
-        if (data.type === 'order' && Array.isArray(data.value)) {
-            return (data.value as unknown[]).filter((id): id is string => typeof id === 'string');
+        if (data.type === "order" && Array.isArray(data.value)) {
+            return (data.value as unknown[]).filter((id): id is string => typeof id === "string");
         }
     } catch {
         // Invalid JSON
@@ -226,31 +230,36 @@ export function parseOrderArray(content: string): string[] {
  * Serialize an order array for storage
  */
 export function serializeOrderArray(instanceIds: string[]): string {
-    return JSON.stringify({ type: 'order', value: instanceIds });
+    return JSON.stringify({ type: "order", value: instanceIds });
 }
 
 /**
  * Known SEO attribute names
  */
-export const SEO_ATTRIBUTES = ['alt', 'title', 'rel'] as const;
-export type SeoAttribute = typeof SEO_ATTRIBUTES[number];
+export const SEO_ATTRIBUTES = ["alt", "title", "rel"] as const;
+export type SeoAttribute = (typeof SEO_ATTRIBUTES)[number];
 
 /**
  * Known accessibility attribute names
  */
-export const ACCESSIBILITY_ATTRIBUTES = ['aria-label', 'aria-describedby', 'role', 'tabindex'] as const;
-export type AccessibilityAttribute = typeof ACCESSIBILITY_ATTRIBUTES[number];
+export const ACCESSIBILITY_ATTRIBUTES = [
+    "aria-label",
+    "aria-describedby",
+    "role",
+    "tabindex",
+] as const;
+export type AccessibilityAttribute = (typeof ACCESSIBILITY_ATTRIBUTES)[number];
 
 /**
  * All known attribute names (SEO + Accessibility)
  */
 export const KNOWN_ATTRIBUTES = [...SEO_ATTRIBUTES, ...ACCESSIBILITY_ATTRIBUTES] as const;
-export type KnownAttribute = typeof KNOWN_ATTRIBUTES[number];
+export type KnownAttribute = (typeof KNOWN_ATTRIBUTES)[number];
 
 /**
  * Attribute field configuration for modals
  */
-export type AttributePriority = 'primary' | 'secondary' | 'not-applicable';
+export type AttributePriority = "primary" | "secondary" | "not-applicable";
 
 export interface AttributeFieldConfig {
     name: string;

@@ -9,7 +9,12 @@
 import { LitElement, html, css, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { tailwindSheet } from "./styles.js";
-import { SEO_ATTRIBUTES, ACCESSIBILITY_ATTRIBUTES, KNOWN_ATTRIBUTES, type ElementAttributes } from "../types.js";
+import {
+    SEO_ATTRIBUTES,
+    ACCESSIBILITY_ATTRIBUTES,
+    KNOWN_ATTRIBUTES,
+    type ElementAttributes,
+} from "../types.js";
 
 interface AttributeEntry {
     name: string;
@@ -309,7 +314,7 @@ export class AttributesModal extends LitElement {
                 detail: { attributes: this.editedAttributes },
                 bubbles: true,
                 composed: true,
-            })
+            }),
         );
     }
 
@@ -322,7 +327,7 @@ export class AttributesModal extends LitElement {
             new CustomEvent("cancel", {
                 bubbles: true,
                 composed: true,
-            })
+            }),
         );
     }
 
@@ -400,7 +405,9 @@ export class AttributesModal extends LitElement {
                 <div class="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
                     <div class="flex items-center gap-2">
                         <span class="text-sm font-medium text-gray-900">Custom Attributes</span>
-                        <span class="text-xs font-mono text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+                        <span
+                            class="text-xs font-mono text-gray-500 bg-gray-100 px-2 py-0.5 rounded"
+                        >
                             ${this.elementId}
                         </span>
                     </div>
@@ -485,7 +492,7 @@ export class AttributesModal extends LitElement {
                                                       @input=${(e: Event) =>
                                                           this.handleValueChange(
                                                               entry.name,
-                                                              (e.target as HTMLInputElement).value
+                                                              (e.target as HTMLInputElement).value,
                                                           )}
                                                   />
                                                   <button
@@ -508,7 +515,7 @@ export class AttributesModal extends LitElement {
                                                       </svg>
                                                   </button>
                                               </div>
-                                          `
+                                          `,
                                       )}
                                   </div>
                               </div>
@@ -517,22 +524,20 @@ export class AttributesModal extends LitElement {
 
                     <!-- Element attributes (read-only) -->
                     <div class="attr-section">
-                        <div class="text-sm font-medium text-gray-500 mb-1">
-                            Element Attributes
-                        </div>
+                        <div class="text-sm font-medium text-gray-500 mb-1">Element Attributes</div>
                         <p class="attr-hint mb-2">Core attributes that define the element</p>
                         <div class="space-y-2">
                             ${elementDefinedEntries.length > 0
-                                ? elementDefinedEntries.map((entry) => this.renderDisabledRow(entry))
+                                ? elementDefinedEntries.map((entry) =>
+                                      this.renderDisabledRow(entry),
+                                  )
                                 : html`<p class="text-sm text-gray-400 italic">None</p>`}
                         </div>
                     </div>
 
                     <!-- SEO attributes (read-only) -->
                     <div class="attr-section">
-                        <div class="text-sm font-medium text-gray-500 mb-1">
-                            SEO Attributes
-                        </div>
+                        <div class="text-sm font-medium text-gray-500 mb-1">SEO Attributes</div>
                         <p class="attr-hint mb-2">Use the SEO button to edit these</p>
                         <div class="space-y-2">
                             ${seoEntries.length > 0
@@ -556,9 +561,7 @@ export class AttributesModal extends LitElement {
 
                     <!-- Other attributes (read-only) -->
                     <div class="attr-section">
-                        <div class="text-sm font-medium text-gray-500 mb-1">
-                            Other Attributes
-                        </div>
+                        <div class="text-sm font-medium text-gray-500 mb-1">Other Attributes</div>
                         <p class="attr-hint mb-2">Additional attributes on this element</p>
                         <div class="space-y-2">
                             ${otherEntries.length > 0
@@ -566,11 +569,12 @@ export class AttributesModal extends LitElement {
                                 : html`<p class="text-sm text-gray-400 italic">None</p>`}
                         </div>
                     </div>
-
                 </div>
 
                 <!-- Footer -->
-                <div class="px-4 py-3 border-t border-gray-200 flex items-center justify-between bg-gray-50">
+                <div
+                    class="px-4 py-3 border-t border-gray-200 flex items-center justify-between bg-gray-50"
+                >
                     <span class="text-xs text-gray-500">
                         <kbd class="px-1.5 py-0.5 bg-gray-200 rounded text-gray-600">⌘</kbd>
                         <kbd class="px-1.5 py-0.5 bg-gray-200 rounded text-gray-600">Enter</kbd>

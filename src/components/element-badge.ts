@@ -18,9 +18,7 @@ export class ElementBadge extends LitElement {
 
     render() {
         if (!this.elementId) {
-            return html`
-                <span class="text-xs text-gray-400 italic">No element selected</span>
-            `;
+            return html` <span class="text-xs text-gray-400 italic">No element selected</span> `;
         }
 
         return html`

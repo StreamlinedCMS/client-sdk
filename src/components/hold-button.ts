@@ -79,7 +79,7 @@ export class HoldButton extends LitElement {
             new CustomEvent("hold-complete", {
                 bubbles: true,
                 composed: true,
-            })
+            }),
         );
     }
 

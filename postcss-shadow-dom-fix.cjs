@@ -43,7 +43,7 @@ const shadowDomFix = () => {
                     new Declaration({
                         prop: name,
                         value: value,
-                    })
+                    }),
                 );
             }
 

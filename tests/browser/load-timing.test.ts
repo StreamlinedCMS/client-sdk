@@ -35,7 +35,7 @@ beforeAll(async () => {
         if (pathname === "/apps/timing-test/content") {
             contentFetchTime = Date.now();
             // Add small delay to make timing measurable
-            await new Promise(resolve => setTimeout(resolve, 50));
+            await new Promise((resolve) => setTimeout(resolve, 50));
             contentResponseTime = Date.now();
 
             res.writeHead(200, {
@@ -43,12 +43,17 @@ beforeAll(async () => {
                 "Access-Control-Allow-Origin": "*",
             });
             // Return new key-value format: { elements: {...}, groups: {...} }
-            res.end(JSON.stringify({
-                elements: {
-                    "test-content": { content: JSON.stringify({ type: "html", value: "Loaded from API" }), updatedAt: new Date().toISOString() }
-                },
-                groups: {}
-            }));
+            res.end(
+                JSON.stringify({
+                    elements: {
+                        "test-content": {
+                            content: JSON.stringify({ type: "html", value: "Loaded from API" }),
+                            updatedAt: new Date().toISOString(),
+                        },
+                    },
+                    groups: {},
+                }),
+            );
             return;
         }
 
@@ -139,7 +144,7 @@ beforeAll(async () => {
 afterAll(async () => {
     await browser.close();
     await new Promise<void>((resolve, reject) => {
-        server.close((err) => err ? reject(err) : resolve());
+        server.close((err) => (err ? reject(err) : resolve()));
     });
 });
 

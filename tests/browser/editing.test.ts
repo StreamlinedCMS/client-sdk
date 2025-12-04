@@ -115,10 +115,13 @@ test("user can edit and save content", async () => {
     await saveButton.click();
 
     // Wait for save to complete and element to be deselected
-    await page.waitForFunction(() => {
-        const title = document.querySelector('[data-scms-html="test-title"]');
-        return title && !title.classList.contains("streamlined-editing");
-    }, { timeout: 3000 });
+    await page.waitForFunction(
+        () => {
+            const title = document.querySelector('[data-scms-html="test-title"]');
+            return title && !title.classList.contains("streamlined-editing");
+        },
+        { timeout: 3000 },
+    );
 
     // Verify content persists after reload
     await page.reload();
@@ -172,12 +175,16 @@ test("content loads from API on page load", async () => {
 
 test("typed link content is parsed correctly (not shown as raw JSON)", async () => {
     // Pre-populate content with typed link JSON
-    server.setContent("test-app", "test-link", JSON.stringify({
-        type: "link",
-        href: "https://parsed-link.com",
-        target: "_blank",
-        text: "Parsed Link Text"
-    }));
+    server.setContent(
+        "test-app",
+        "test-link",
+        JSON.stringify({
+            type: "link",
+            href: "https://parsed-link.com",
+            target: "_blank",
+            text: "Parsed Link Text",
+        }),
+    );
 
     await page.goto(testUrl);
     await page.waitForSelector(".streamlined-editable");
@@ -199,10 +206,14 @@ test("typed link content is parsed correctly (not shown as raw JSON)", async () 
 
 test("typed html content is parsed correctly", async () => {
     server.clearContent();
-    server.setContent("test-app", "test-title", JSON.stringify({
-        type: "html",
-        value: "<strong>Bold Title</strong>"
-    }));
+    server.setContent(
+        "test-app",
+        "test-title",
+        JSON.stringify({
+            type: "html",
+            value: "<strong>Bold Title</strong>",
+        }),
+    );
 
     await page.goto(testUrl);
     await page.waitForSelector(".streamlined-editable");
@@ -216,10 +227,14 @@ test("typed html content is parsed correctly", async () => {
 
 test("typed text content is parsed correctly", async () => {
     server.clearContent();
-    server.setContent("test-app", "test-paragraph", JSON.stringify({
-        type: "text",
-        value: "Plain text content"
-    }));
+    server.setContent(
+        "test-app",
+        "test-paragraph",
+        JSON.stringify({
+            type: "text",
+            value: "Plain text content",
+        }),
+    );
 
     await page.goto(testUrl);
     await page.waitForSelector(".streamlined-editable");
@@ -234,11 +249,15 @@ test("typed text content is parsed correctly", async () => {
 test("JSON without type field uses element's declared type", async () => {
     server.clearContent();
     // Old link format: JSON with href/target/text but NO type field
-    server.setContent("test-app", "test-link", JSON.stringify({
-        href: "https://old-format-link.com",
-        target: "_blank",
-        text: "Old Format Link"
-    }));
+    server.setContent(
+        "test-app",
+        "test-link",
+        JSON.stringify({
+            href: "https://old-format-link.com",
+            target: "_blank",
+            text: "Old Format Link",
+        }),
+    );
 
     await page.goto(testUrl);
     await page.waitForSelector(".streamlined-editable");
@@ -275,13 +294,41 @@ test("template with single instance shows default content", async () => {
 test("template clones instances based on stored content", async () => {
     server.clearContent();
     // Set content for 3 team member instances using stable IDs
-    server.setContent("test-app", "team.abc12.name", JSON.stringify({ type: "text", value: "Alice" }));
-    server.setContent("test-app", "team.abc12.role", JSON.stringify({ type: "text", value: "CEO" }));
-    server.setContent("test-app", "team.def34.name", JSON.stringify({ type: "text", value: "Bob" }));
-    server.setContent("test-app", "team.def34.role", JSON.stringify({ type: "text", value: "CTO" }));
-    server.setContent("test-app", "team.ghi56.name", JSON.stringify({ type: "text", value: "Carol" }));
-    server.setContent("test-app", "team.ghi56.role", JSON.stringify({ type: "text", value: "Designer" }));
-    server.setContent("test-app", "team._order", JSON.stringify({ type: "order", value: ["abc12", "def34", "ghi56"] }));
+    server.setContent(
+        "test-app",
+        "team.abc12.name",
+        JSON.stringify({ type: "text", value: "Alice" }),
+    );
+    server.setContent(
+        "test-app",
+        "team.abc12.role",
+        JSON.stringify({ type: "text", value: "CEO" }),
+    );
+    server.setContent(
+        "test-app",
+        "team.def34.name",
+        JSON.stringify({ type: "text", value: "Bob" }),
+    );
+    server.setContent(
+        "test-app",
+        "team.def34.role",
+        JSON.stringify({ type: "text", value: "CTO" }),
+    );
+    server.setContent(
+        "test-app",
+        "team.ghi56.name",
+        JSON.stringify({ type: "text", value: "Carol" }),
+    );
+    server.setContent(
+        "test-app",
+        "team.ghi56.role",
+        JSON.stringify({ type: "text", value: "Designer" }),
+    );
+    server.setContent(
+        "test-app",
+        "team._order",
+        JSON.stringify({ type: "order", value: ["abc12", "def34", "ghi56"] }),
+    );
 
     await page.goto(testUrl);
     await page.waitForSelector(".streamlined-editable");
@@ -298,14 +345,28 @@ test("template clones instances based on stored content", async () => {
     expect(await teamMembers.nth(1).locator('[data-scms-text="name"]').textContent()).toBe("Bob");
     expect(await teamMembers.nth(1).locator('[data-scms-text="role"]').textContent()).toBe("CTO");
     expect(await teamMembers.nth(2).locator('[data-scms-text="name"]').textContent()).toBe("Carol");
-    expect(await teamMembers.nth(2).locator('[data-scms-text="role"]').textContent()).toBe("Designer");
+    expect(await teamMembers.nth(2).locator('[data-scms-text="role"]').textContent()).toBe(
+        "Designer",
+    );
 });
 
 test("template instances have correct data-scms-instance attributes", async () => {
     server.clearContent();
-    server.setContent("test-app", "team.abc12.name", JSON.stringify({ type: "text", value: "Alice" }));
-    server.setContent("test-app", "team.def34.name", JSON.stringify({ type: "text", value: "Bob" }));
-    server.setContent("test-app", "team._order", JSON.stringify({ type: "order", value: ["abc12", "def34"] }));
+    server.setContent(
+        "test-app",
+        "team.abc12.name",
+        JSON.stringify({ type: "text", value: "Alice" }),
+    );
+    server.setContent(
+        "test-app",
+        "team.def34.name",
+        JSON.stringify({ type: "text", value: "Bob" }),
+    );
+    server.setContent(
+        "test-app",
+        "team._order",
+        JSON.stringify({ type: "order", value: ["abc12", "def34"] }),
+    );
 
     await page.goto(testUrl);
     await page.waitForSelector(".streamlined-editable");
@@ -321,11 +382,31 @@ test("template instances have correct data-scms-instance attributes", async () =
 test("template inside group uses grouped storage keys", async () => {
     server.clearContent();
     // Template inside sidebar group - storage format: groupId:templateId.instanceId.elementId
-    server.setContent("test-app", "sidebar:testimonials.abc12.quote", JSON.stringify({ type: "text", value: "Great product!" }));
-    server.setContent("test-app", "sidebar:testimonials.abc12.author", JSON.stringify({ type: "text", value: "John Doe" }));
-    server.setContent("test-app", "sidebar:testimonials.def34.quote", JSON.stringify({ type: "text", value: "Love it!" }));
-    server.setContent("test-app", "sidebar:testimonials.def34.author", JSON.stringify({ type: "text", value: "Jane Smith" }));
-    server.setContent("test-app", "sidebar:testimonials._order", JSON.stringify({ type: "order", value: ["abc12", "def34"] }));
+    server.setContent(
+        "test-app",
+        "sidebar:testimonials.abc12.quote",
+        JSON.stringify({ type: "text", value: "Great product!" }),
+    );
+    server.setContent(
+        "test-app",
+        "sidebar:testimonials.abc12.author",
+        JSON.stringify({ type: "text", value: "John Doe" }),
+    );
+    server.setContent(
+        "test-app",
+        "sidebar:testimonials.def34.quote",
+        JSON.stringify({ type: "text", value: "Love it!" }),
+    );
+    server.setContent(
+        "test-app",
+        "sidebar:testimonials.def34.author",
+        JSON.stringify({ type: "text", value: "Jane Smith" }),
+    );
+    server.setContent(
+        "test-app",
+        "sidebar:testimonials._order",
+        JSON.stringify({ type: "order", value: ["abc12", "def34"] }),
+    );
 
     await page.goto(testUrl);
     await page.waitForSelector(".streamlined-editable");
@@ -337,17 +418,37 @@ test("template inside group uses grouped storage keys", async () => {
     expect(await testimonials.count()).toBe(2);
 
     // Verify content
-    expect(await testimonials.nth(0).locator('[data-scms-text="quote"]').textContent()).toBe("Great product!");
-    expect(await testimonials.nth(0).locator('[data-scms-text="author"]').textContent()).toBe("John Doe");
-    expect(await testimonials.nth(1).locator('[data-scms-text="quote"]').textContent()).toBe("Love it!");
-    expect(await testimonials.nth(1).locator('[data-scms-text="author"]').textContent()).toBe("Jane Smith");
+    expect(await testimonials.nth(0).locator('[data-scms-text="quote"]').textContent()).toBe(
+        "Great product!",
+    );
+    expect(await testimonials.nth(0).locator('[data-scms-text="author"]').textContent()).toBe(
+        "John Doe",
+    );
+    expect(await testimonials.nth(1).locator('[data-scms-text="quote"]').textContent()).toBe(
+        "Love it!",
+    );
+    expect(await testimonials.nth(1).locator('[data-scms-text="author"]').textContent()).toBe(
+        "Jane Smith",
+    );
 });
 
 test("editing template instance element saves with correct key", async () => {
     server.clearContent();
-    server.setContent("test-app", "team.abc12.name", JSON.stringify({ type: "text", value: "Alice" }));
-    server.setContent("test-app", "team.def34.name", JSON.stringify({ type: "text", value: "Bob" }));
-    server.setContent("test-app", "team._order", JSON.stringify({ type: "order", value: ["abc12", "def34"] }));
+    server.setContent(
+        "test-app",
+        "team.abc12.name",
+        JSON.stringify({ type: "text", value: "Alice" }),
+    );
+    server.setContent(
+        "test-app",
+        "team.def34.name",
+        JSON.stringify({ type: "text", value: "Bob" }),
+    );
+    server.setContent(
+        "test-app",
+        "team._order",
+        JSON.stringify({ type: "order", value: ["abc12", "def34"] }),
+    );
 
     await page.goto(testUrl);
     await page.waitForSelector("scms-toolbar");
@@ -364,18 +465,27 @@ test("editing template instance element saves with correct key", async () => {
     await saveButton.click();
 
     // Wait for save to complete
-    await page.waitForFunction(() => {
-        const name = document.querySelectorAll('[data-scms-template="team"] .team-member')[1]?.querySelector('[data-scms-text="name"]');
-        return name && !name.classList.contains("streamlined-editing");
-    }, { timeout: 3000 });
+    await page.waitForFunction(
+        () => {
+            const name = document
+                .querySelectorAll('[data-scms-template="team"] .team-member')[1]
+                ?.querySelector('[data-scms-text="name"]');
+            return name && !name.classList.contains("streamlined-editing");
+        },
+        { timeout: 3000 },
+    );
 
     // Reload and verify content persisted with correct key (team.def34.name)
     await page.reload();
     await page.waitForSelector(".streamlined-editable");
 
     const reloadedMembers = page.locator('[data-scms-template="team"] .team-member');
-    expect(await reloadedMembers.nth(0).locator('[data-scms-text="name"]').textContent()).toBe("Alice");
-    expect(await reloadedMembers.nth(1).locator('[data-scms-text="name"]').textContent()).toBe("Bobby");
+    expect(await reloadedMembers.nth(0).locator('[data-scms-text="name"]').textContent()).toBe(
+        "Alice",
+    );
+    expect(await reloadedMembers.nth(1).locator('[data-scms-text="name"]').textContent()).toBe(
+        "Bobby",
+    );
 });
 
 // Group inside template tests (shared content across instances)
@@ -383,13 +493,37 @@ test("editing template instance element saves with correct key", async () => {
 test("group inside template shares content across all instances", async () => {
     server.clearContent();
     // Set up 3 product instances using stable IDs
-    server.setContent("test-app", "products.abc12.product-name", JSON.stringify({ type: "text", value: "Widget A" }));
-    server.setContent("test-app", "products.def34.product-name", JSON.stringify({ type: "text", value: "Widget B" }));
-    server.setContent("test-app", "products.ghi56.product-name", JSON.stringify({ type: "text", value: "Widget C" }));
-    server.setContent("test-app", "products._order", JSON.stringify({ type: "order", value: ["abc12", "def34", "ghi56"] }));
+    server.setContent(
+        "test-app",
+        "products.abc12.product-name",
+        JSON.stringify({ type: "text", value: "Widget A" }),
+    );
+    server.setContent(
+        "test-app",
+        "products.def34.product-name",
+        JSON.stringify({ type: "text", value: "Widget B" }),
+    );
+    server.setContent(
+        "test-app",
+        "products.ghi56.product-name",
+        JSON.stringify({ type: "text", value: "Widget C" }),
+    );
+    server.setContent(
+        "test-app",
+        "products._order",
+        JSON.stringify({ type: "order", value: ["abc12", "def34", "ghi56"] }),
+    );
     // Shared company info (no template instance, just group:element)
-    server.setContent("test-app", "company:name", JSON.stringify({ type: "text", value: "Acme Corp" }));
-    server.setContent("test-app", "company:tagline", JSON.stringify({ type: "text", value: "Quality Products" }));
+    server.setContent(
+        "test-app",
+        "company:name",
+        JSON.stringify({ type: "text", value: "Acme Corp" }),
+    );
+    server.setContent(
+        "test-app",
+        "company:tagline",
+        JSON.stringify({ type: "text", value: "Quality Products" }),
+    );
 
     await page.goto(testUrl);
     await page.waitForSelector(".streamlined-editable");
@@ -400,14 +534,26 @@ test("group inside template shares content across all instances", async () => {
     expect(await products.count()).toBe(3);
 
     // Each product has unique name
-    expect(await products.nth(0).locator('[data-scms-text="product-name"]').textContent()).toBe("Widget A");
-    expect(await products.nth(1).locator('[data-scms-text="product-name"]').textContent()).toBe("Widget B");
-    expect(await products.nth(2).locator('[data-scms-text="product-name"]').textContent()).toBe("Widget C");
+    expect(await products.nth(0).locator('[data-scms-text="product-name"]').textContent()).toBe(
+        "Widget A",
+    );
+    expect(await products.nth(1).locator('[data-scms-text="product-name"]').textContent()).toBe(
+        "Widget B",
+    );
+    expect(await products.nth(2).locator('[data-scms-text="product-name"]').textContent()).toBe(
+        "Widget C",
+    );
 
     // All products share the same company info
     for (let i = 0; i < 3; i++) {
-        const companyName = await products.nth(i).locator('[data-scms-group="company"] [data-scms-text="name"]').textContent();
-        const tagline = await products.nth(i).locator('[data-scms-group="company"] [data-scms-text="tagline"]').textContent();
+        const companyName = await products
+            .nth(i)
+            .locator('[data-scms-group="company"] [data-scms-text="name"]')
+            .textContent();
+        const tagline = await products
+            .nth(i)
+            .locator('[data-scms-group="company"] [data-scms-text="tagline"]')
+            .textContent();
         expect(companyName).toBe("Acme Corp");
         expect(tagline).toBe("Quality Products");
     }
@@ -416,11 +562,27 @@ test("group inside template shares content across all instances", async () => {
 test("editing group element inside template updates all instances in real-time", async () => {
     server.clearContent();
     // Set up 2 product instances using stable IDs
-    server.setContent("test-app", "products.abc12.product-name", JSON.stringify({ type: "text", value: "Product 1" }));
-    server.setContent("test-app", "products.def34.product-name", JSON.stringify({ type: "text", value: "Product 2" }));
-    server.setContent("test-app", "products._order", JSON.stringify({ type: "order", value: ["abc12", "def34"] }));
+    server.setContent(
+        "test-app",
+        "products.abc12.product-name",
+        JSON.stringify({ type: "text", value: "Product 1" }),
+    );
+    server.setContent(
+        "test-app",
+        "products.def34.product-name",
+        JSON.stringify({ type: "text", value: "Product 2" }),
+    );
+    server.setContent(
+        "test-app",
+        "products._order",
+        JSON.stringify({ type: "order", value: ["abc12", "def34"] }),
+    );
     // Shared company name
-    server.setContent("test-app", "company:name", JSON.stringify({ type: "text", value: "Old Company" }));
+    server.setContent(
+        "test-app",
+        "company:name",
+        JSON.stringify({ type: "text", value: "Old Company" }),
+    );
 
     await page.goto(testUrl);
     await page.waitForSelector("scms-toolbar");
@@ -429,8 +591,12 @@ test("editing group element inside template updates all instances in real-time",
     expect(await products.count()).toBe(2);
 
     // Click on company name in first product
-    const firstCompanyName = products.nth(0).locator('[data-scms-group="company"] [data-scms-text="name"]');
-    const secondCompanyName = products.nth(1).locator('[data-scms-group="company"] [data-scms-text="name"]');
+    const firstCompanyName = products
+        .nth(0)
+        .locator('[data-scms-group="company"] [data-scms-text="name"]');
+    const secondCompanyName = products
+        .nth(1)
+        .locator('[data-scms-group="company"] [data-scms-text="name"]');
 
     await firstCompanyName.click();
 
@@ -452,16 +618,34 @@ test("editing group element inside template updates all instances in real-time",
 
 test("saving shared group element persists with correct key format", async () => {
     server.clearContent();
-    server.setContent("test-app", "products.abc12.product-name", JSON.stringify({ type: "text", value: "Product 1" }));
-    server.setContent("test-app", "products.def34.product-name", JSON.stringify({ type: "text", value: "Product 2" }));
-    server.setContent("test-app", "products._order", JSON.stringify({ type: "order", value: ["abc12", "def34"] }));
-    server.setContent("test-app", "company:name", JSON.stringify({ type: "text", value: "Original" }));
+    server.setContent(
+        "test-app",
+        "products.abc12.product-name",
+        JSON.stringify({ type: "text", value: "Product 1" }),
+    );
+    server.setContent(
+        "test-app",
+        "products.def34.product-name",
+        JSON.stringify({ type: "text", value: "Product 2" }),
+    );
+    server.setContent(
+        "test-app",
+        "products._order",
+        JSON.stringify({ type: "order", value: ["abc12", "def34"] }),
+    );
+    server.setContent(
+        "test-app",
+        "company:name",
+        JSON.stringify({ type: "text", value: "Original" }),
+    );
 
     await page.goto(testUrl);
     await page.waitForSelector("scms-toolbar");
 
     const products = page.locator('[data-scms-template="products"] .product-card');
-    const firstCompanyName = products.nth(0).locator('[data-scms-group="company"] [data-scms-text="name"]');
+    const firstCompanyName = products
+        .nth(0)
+        .locator('[data-scms-group="company"] [data-scms-text="name"]');
 
     await firstCompanyName.click();
     await firstCompanyName.fill("Updated Company");
@@ -471,10 +655,15 @@ test("saving shared group element persists with correct key format", async () =>
     await saveButton.click();
 
     // Wait for save to complete
-    await page.waitForFunction(() => {
-        const el = document.querySelector('[data-scms-template="products"] .product-card [data-scms-group="company"] [data-scms-text="name"]');
-        return el && !el.classList.contains("streamlined-editing");
-    }, { timeout: 3000 });
+    await page.waitForFunction(
+        () => {
+            const el = document.querySelector(
+                '[data-scms-template="products"] .product-card [data-scms-group="company"] [data-scms-text="name"]',
+            );
+            return el && !el.classList.contains("streamlined-editing");
+        },
+        { timeout: 3000 },
+    );
 
     // Reload and verify content persisted
     await page.reload();
@@ -483,8 +672,18 @@ test("saving shared group element persists with correct key format", async () =>
     const reloadedProducts = page.locator('[data-scms-template="products"] .product-card');
 
     // Both instances should show the updated company name
-    expect(await reloadedProducts.nth(0).locator('[data-scms-group="company"] [data-scms-text="name"]').textContent()).toBe("Updated Company");
-    expect(await reloadedProducts.nth(1).locator('[data-scms-group="company"] [data-scms-text="name"]').textContent()).toBe("Updated Company");
+    expect(
+        await reloadedProducts
+            .nth(0)
+            .locator('[data-scms-group="company"] [data-scms-text="name"]')
+            .textContent(),
+    ).toBe("Updated Company");
+    expect(
+        await reloadedProducts
+            .nth(1)
+            .locator('[data-scms-group="company"] [data-scms-text="name"]')
+            .textContent(),
+    ).toBe("Updated Company");
 });
 
 // Template instance add/remove tests
@@ -503,8 +702,16 @@ test("add button appears in author mode for templates", async () => {
 
 test("clicking add button creates new template instance", async () => {
     server.clearContent();
-    server.setContent("test-app", "team.abc12.name", JSON.stringify({ type: "text", value: "Alice" }));
-    server.setContent("test-app", "team._order", JSON.stringify({ type: "order", value: ["abc12"] }));
+    server.setContent(
+        "test-app",
+        "team.abc12.name",
+        JSON.stringify({ type: "text", value: "Alice" }),
+    );
+    server.setContent(
+        "test-app",
+        "team._order",
+        JSON.stringify({ type: "order", value: ["abc12"] }),
+    );
 
     await page.goto(testUrl);
     await page.waitForSelector("scms-toolbar");
@@ -560,9 +767,21 @@ test("new instance elements are editable", async () => {
 
 test("delete button appears on instance hover", async () => {
     server.clearContent();
-    server.setContent("test-app", "team.abc12.name", JSON.stringify({ type: "text", value: "Alice" }));
-    server.setContent("test-app", "team.def34.name", JSON.stringify({ type: "text", value: "Bob" }));
-    server.setContent("test-app", "team._order", JSON.stringify({ type: "order", value: ["abc12", "def34"] }));
+    server.setContent(
+        "test-app",
+        "team.abc12.name",
+        JSON.stringify({ type: "text", value: "Alice" }),
+    );
+    server.setContent(
+        "test-app",
+        "team.def34.name",
+        JSON.stringify({ type: "text", value: "Bob" }),
+    );
+    server.setContent(
+        "test-app",
+        "team._order",
+        JSON.stringify({ type: "order", value: ["abc12", "def34"] }),
+    );
 
     await page.goto(testUrl);
     await page.waitForSelector("scms-toolbar");
@@ -575,10 +794,15 @@ test("delete button appears on instance hover", async () => {
 
     // Delete button should become visible
     const deleteButton = teamMembers.nth(1).locator(".scms-instance-delete");
-    await page.waitForFunction(() => {
-        const btn = document.querySelectorAll('[data-scms-template="team"] .team-member')[1]?.querySelector('.scms-instance-delete');
-        return btn && window.getComputedStyle(btn).opacity === "1";
-    }, { timeout: 2000 });
+    await page.waitForFunction(
+        () => {
+            const btn = document
+                .querySelectorAll('[data-scms-template="team"] .team-member')[1]
+                ?.querySelector(".scms-instance-delete");
+            return btn && window.getComputedStyle(btn).opacity === "1";
+        },
+        { timeout: 2000 },
+    );
 
     expect(await deleteButton.isVisible()).toBe(true);
 });
@@ -586,11 +810,27 @@ test("delete button appears on instance hover", async () => {
 test("clicking delete button removes instance", async () => {
     server.clearContent();
     // Use stable instance IDs in content keys
-    server.setContent("test-app", "team.abc12.name", JSON.stringify({ type: "text", value: "Alice" }));
-    server.setContent("test-app", "team.def34.name", JSON.stringify({ type: "text", value: "Bob" }));
-    server.setContent("test-app", "team.ghi56.name", JSON.stringify({ type: "text", value: "Carol" }));
+    server.setContent(
+        "test-app",
+        "team.abc12.name",
+        JSON.stringify({ type: "text", value: "Alice" }),
+    );
+    server.setContent(
+        "test-app",
+        "team.def34.name",
+        JSON.stringify({ type: "text", value: "Bob" }),
+    );
+    server.setContent(
+        "test-app",
+        "team.ghi56.name",
+        JSON.stringify({ type: "text", value: "Carol" }),
+    );
     // Order array determines display order
-    server.setContent("test-app", "team._order", JSON.stringify({ type: "order", value: ["abc12", "def34", "ghi56"] }));
+    server.setContent(
+        "test-app",
+        "team._order",
+        JSON.stringify({ type: "order", value: ["abc12", "def34", "ghi56"] }),
+    );
 
     await page.goto(testUrl);
     await page.waitForSelector("scms-toolbar");
@@ -619,8 +859,16 @@ test("clicking delete button removes instance", async () => {
 
 test("cannot delete last instance", async () => {
     server.clearContent();
-    server.setContent("test-app", "team.abc12.name", JSON.stringify({ type: "text", value: "Alice" }));
-    server.setContent("test-app", "team._order", JSON.stringify({ type: "order", value: ["abc12"] }));
+    server.setContent(
+        "test-app",
+        "team.abc12.name",
+        JSON.stringify({ type: "text", value: "Alice" }),
+    );
+    server.setContent(
+        "test-app",
+        "team._order",
+        JSON.stringify({ type: "order", value: ["abc12"] }),
+    );
 
     await page.goto(testUrl);
     await page.waitForSelector("scms-toolbar");
@@ -645,9 +893,21 @@ test("cannot delete last instance", async () => {
 
 test("toolbar shows template controls when editing element inside template", async () => {
     server.clearContent();
-    server.setContent("test-app", "team.abc12.name", JSON.stringify({ type: "text", value: "Alice" }));
-    server.setContent("test-app", "team.def34.name", JSON.stringify({ type: "text", value: "Bob" }));
-    server.setContent("test-app", "team._order", JSON.stringify({ type: "order", value: ["abc12", "def34"] }));
+    server.setContent(
+        "test-app",
+        "team.abc12.name",
+        JSON.stringify({ type: "text", value: "Alice" }),
+    );
+    server.setContent(
+        "test-app",
+        "team.def34.name",
+        JSON.stringify({ type: "text", value: "Bob" }),
+    );
+    server.setContent(
+        "test-app",
+        "team._order",
+        JSON.stringify({ type: "order", value: ["abc12", "def34"] }),
+    );
 
     await page.goto(testUrl);
     await page.waitForSelector("scms-toolbar");
@@ -686,10 +946,26 @@ test("toolbar template controls are hidden when editing non-template element", a
 
 test("toolbar move up button reorders instance", async () => {
     server.clearContent();
-    server.setContent("test-app", "team.abc12.name", JSON.stringify({ type: "text", value: "Alice" }));
-    server.setContent("test-app", "team.def34.name", JSON.stringify({ type: "text", value: "Bob" }));
-    server.setContent("test-app", "team.ghi56.name", JSON.stringify({ type: "text", value: "Carol" }));
-    server.setContent("test-app", "team._order", JSON.stringify({ type: "order", value: ["abc12", "def34", "ghi56"] }));
+    server.setContent(
+        "test-app",
+        "team.abc12.name",
+        JSON.stringify({ type: "text", value: "Alice" }),
+    );
+    server.setContent(
+        "test-app",
+        "team.def34.name",
+        JSON.stringify({ type: "text", value: "Bob" }),
+    );
+    server.setContent(
+        "test-app",
+        "team.ghi56.name",
+        JSON.stringify({ type: "text", value: "Carol" }),
+    );
+    server.setContent(
+        "test-app",
+        "team._order",
+        JSON.stringify({ type: "order", value: ["abc12", "def34", "ghi56"] }),
+    );
 
     await page.goto(testUrl);
     await page.waitForSelector("scms-toolbar");
@@ -717,10 +993,26 @@ test("toolbar move up button reorders instance", async () => {
 
 test("toolbar move down button reorders instance", async () => {
     server.clearContent();
-    server.setContent("test-app", "team.abc12.name", JSON.stringify({ type: "text", value: "Alice" }));
-    server.setContent("test-app", "team.def34.name", JSON.stringify({ type: "text", value: "Bob" }));
-    server.setContent("test-app", "team.ghi56.name", JSON.stringify({ type: "text", value: "Carol" }));
-    server.setContent("test-app", "team._order", JSON.stringify({ type: "order", value: ["abc12", "def34", "ghi56"] }));
+    server.setContent(
+        "test-app",
+        "team.abc12.name",
+        JSON.stringify({ type: "text", value: "Alice" }),
+    );
+    server.setContent(
+        "test-app",
+        "team.def34.name",
+        JSON.stringify({ type: "text", value: "Bob" }),
+    );
+    server.setContent(
+        "test-app",
+        "team.ghi56.name",
+        JSON.stringify({ type: "text", value: "Carol" }),
+    );
+    server.setContent(
+        "test-app",
+        "team._order",
+        JSON.stringify({ type: "order", value: ["abc12", "def34", "ghi56"] }),
+    );
 
     await page.goto(testUrl);
     await page.waitForSelector("scms-toolbar");
@@ -743,9 +1035,21 @@ test("toolbar move down button reorders instance", async () => {
 
 test("toolbar move up button is disabled for first instance", async () => {
     server.clearContent();
-    server.setContent("test-app", "team.abc12.name", JSON.stringify({ type: "text", value: "Alice" }));
-    server.setContent("test-app", "team.def34.name", JSON.stringify({ type: "text", value: "Bob" }));
-    server.setContent("test-app", "team._order", JSON.stringify({ type: "order", value: ["abc12", "def34"] }));
+    server.setContent(
+        "test-app",
+        "team.abc12.name",
+        JSON.stringify({ type: "text", value: "Alice" }),
+    );
+    server.setContent(
+        "test-app",
+        "team.def34.name",
+        JSON.stringify({ type: "text", value: "Bob" }),
+    );
+    server.setContent(
+        "test-app",
+        "team._order",
+        JSON.stringify({ type: "order", value: ["abc12", "def34"] }),
+    );
 
     await page.goto(testUrl);
     await page.waitForSelector("scms-toolbar");
@@ -763,9 +1067,21 @@ test("toolbar move up button is disabled for first instance", async () => {
 
 test("toolbar move down button is disabled for last instance", async () => {
     server.clearContent();
-    server.setContent("test-app", "team.abc12.name", JSON.stringify({ type: "text", value: "Alice" }));
-    server.setContent("test-app", "team.def34.name", JSON.stringify({ type: "text", value: "Bob" }));
-    server.setContent("test-app", "team._order", JSON.stringify({ type: "order", value: ["abc12", "def34"] }));
+    server.setContent(
+        "test-app",
+        "team.abc12.name",
+        JSON.stringify({ type: "text", value: "Alice" }),
+    );
+    server.setContent(
+        "test-app",
+        "team.def34.name",
+        JSON.stringify({ type: "text", value: "Bob" }),
+    );
+    server.setContent(
+        "test-app",
+        "team._order",
+        JSON.stringify({ type: "order", value: ["abc12", "def34"] }),
+    );
 
     await page.goto(testUrl);
     await page.waitForSelector("scms-toolbar");
@@ -783,8 +1099,16 @@ test("toolbar move down button is disabled for last instance", async () => {
 
 test("toolbar add button creates new instance", async () => {
     server.clearContent();
-    server.setContent("test-app", "team.abc12.name", JSON.stringify({ type: "text", value: "Alice" }));
-    server.setContent("test-app", "team._order", JSON.stringify({ type: "order", value: ["abc12"] }));
+    server.setContent(
+        "test-app",
+        "team.abc12.name",
+        JSON.stringify({ type: "text", value: "Alice" }),
+    );
+    server.setContent(
+        "test-app",
+        "team._order",
+        JSON.stringify({ type: "order", value: ["abc12"] }),
+    );
 
     await page.goto(testUrl);
     await page.waitForSelector("scms-toolbar");
@@ -810,9 +1134,21 @@ test("toolbar add button creates new instance", async () => {
 
 test("toolbar delete button removes current instance", async () => {
     server.clearContent();
-    server.setContent("test-app", "team.abc12.name", JSON.stringify({ type: "text", value: "Alice" }));
-    server.setContent("test-app", "team.def34.name", JSON.stringify({ type: "text", value: "Bob" }));
-    server.setContent("test-app", "team._order", JSON.stringify({ type: "order", value: ["abc12", "def34"] }));
+    server.setContent(
+        "test-app",
+        "team.abc12.name",
+        JSON.stringify({ type: "text", value: "Alice" }),
+    );
+    server.setContent(
+        "test-app",
+        "team.def34.name",
+        JSON.stringify({ type: "text", value: "Bob" }),
+    );
+    server.setContent(
+        "test-app",
+        "team._order",
+        JSON.stringify({ type: "order", value: ["abc12", "def34"] }),
+    );
 
     await page.goto(testUrl);
     await page.waitForSelector("scms-toolbar");
@@ -841,8 +1177,16 @@ test("toolbar delete button removes current instance", async () => {
 
 test("toolbar delete button is disabled for single instance", async () => {
     server.clearContent();
-    server.setContent("test-app", "team.abc12.name", JSON.stringify({ type: "text", value: "Alice" }));
-    server.setContent("test-app", "team._order", JSON.stringify({ type: "order", value: ["abc12"] }));
+    server.setContent(
+        "test-app",
+        "team.abc12.name",
+        JSON.stringify({ type: "text", value: "Alice" }),
+    );
+    server.setContent(
+        "test-app",
+        "team._order",
+        JSON.stringify({ type: "order", value: ["abc12"] }),
+    );
 
     await page.goto(testUrl);
     await page.waitForSelector("scms-toolbar");
@@ -860,9 +1204,21 @@ test("toolbar delete button is disabled for single instance", async () => {
 
 test("reorder is saved and persists after reload", async () => {
     server.clearContent();
-    server.setContent("test-app", "team.abc12.name", JSON.stringify({ type: "text", value: "Alice" }));
-    server.setContent("test-app", "team.def34.name", JSON.stringify({ type: "text", value: "Bob" }));
-    server.setContent("test-app", "team._order", JSON.stringify({ type: "order", value: ["abc12", "def34"] }));
+    server.setContent(
+        "test-app",
+        "team.abc12.name",
+        JSON.stringify({ type: "text", value: "Alice" }),
+    );
+    server.setContent(
+        "test-app",
+        "team.def34.name",
+        JSON.stringify({ type: "text", value: "Bob" }),
+    );
+    server.setContent(
+        "test-app",
+        "team._order",
+        JSON.stringify({ type: "order", value: ["abc12", "def34"] }),
+    );
 
     await page.goto(testUrl);
     await page.waitForSelector("scms-toolbar");
@@ -888,27 +1244,46 @@ test("reorder is saved and persists after reload", async () => {
     await saveButton.click();
 
     // Wait for save to complete
-    await page.waitForFunction(() => {
-        const toolbar = document.querySelector('scms-toolbar');
-        return toolbar && !toolbar.hasAttribute('saving');
-    }, { timeout: 3000 });
+    await page.waitForFunction(
+        () => {
+            const toolbar = document.querySelector("scms-toolbar");
+            return toolbar && !toolbar.hasAttribute("saving");
+        },
+        { timeout: 3000 },
+    );
 
     // Reload and verify order persisted
     await page.reload();
     await page.waitForSelector(".streamlined-editable");
 
     const reloadedMembers = page.locator('[data-scms-template="team"] .team-member');
-    expect(await reloadedMembers.nth(0).locator('[data-scms-text="name"]').textContent()).toBe("Bob");
-    expect(await reloadedMembers.nth(1).locator('[data-scms-text="name"]').textContent()).toBe("Alice");
+    expect(await reloadedMembers.nth(0).locator('[data-scms-text="name"]').textContent()).toBe(
+        "Bob",
+    );
+    expect(await reloadedMembers.nth(1).locator('[data-scms-text="name"]').textContent()).toBe(
+        "Alice",
+    );
 });
 
 // Drag-and-drop reordering tests
 
 test("drag handle appears on instance hover when multiple instances exist", async () => {
     server.clearContent();
-    server.setContent("test-app", "team.abc12.name", JSON.stringify({ type: "text", value: "Alice" }));
-    server.setContent("test-app", "team.def34.name", JSON.stringify({ type: "text", value: "Bob" }));
-    server.setContent("test-app", "team._order", JSON.stringify({ type: "order", value: ["abc12", "def34"] }));
+    server.setContent(
+        "test-app",
+        "team.abc12.name",
+        JSON.stringify({ type: "text", value: "Alice" }),
+    );
+    server.setContent(
+        "test-app",
+        "team.def34.name",
+        JSON.stringify({ type: "text", value: "Bob" }),
+    );
+    server.setContent(
+        "test-app",
+        "team._order",
+        JSON.stringify({ type: "order", value: ["abc12", "def34"] }),
+    );
 
     await page.goto(testUrl);
     await page.waitForSelector("scms-toolbar");
@@ -920,18 +1295,31 @@ test("drag handle appears on instance hover when multiple instances exist", asyn
 
     // Drag handle should become visible
     const dragHandle = teamMembers.nth(0).locator(".scms-instance-drag-handle");
-    await page.waitForFunction(() => {
-        const handle = document.querySelector('[data-scms-template="team"] .team-member .scms-instance-drag-handle');
-        return handle && window.getComputedStyle(handle).opacity === "1";
-    }, { timeout: 2000 });
+    await page.waitForFunction(
+        () => {
+            const handle = document.querySelector(
+                '[data-scms-template="team"] .team-member .scms-instance-drag-handle',
+            );
+            return handle && window.getComputedStyle(handle).opacity === "1";
+        },
+        { timeout: 2000 },
+    );
 
     expect(await dragHandle.isVisible()).toBe(true);
 });
 
 test("drag handle does not appear for single instance", async () => {
     server.clearContent();
-    server.setContent("test-app", "team.abc12.name", JSON.stringify({ type: "text", value: "Alice" }));
-    server.setContent("test-app", "team._order", JSON.stringify({ type: "order", value: ["abc12"] }));
+    server.setContent(
+        "test-app",
+        "team.abc12.name",
+        JSON.stringify({ type: "text", value: "Alice" }),
+    );
+    server.setContent(
+        "test-app",
+        "team._order",
+        JSON.stringify({ type: "order", value: ["abc12"] }),
+    );
 
     await page.goto(testUrl);
     await page.waitForSelector("scms-toolbar");
@@ -948,10 +1336,26 @@ test("drag handle does not appear for single instance", async () => {
 
 test("drag and drop reorders instances", async () => {
     server.clearContent();
-    server.setContent("test-app", "team.abc12.name", JSON.stringify({ type: "text", value: "Alice" }));
-    server.setContent("test-app", "team.def34.name", JSON.stringify({ type: "text", value: "Bob" }));
-    server.setContent("test-app", "team.ghi56.name", JSON.stringify({ type: "text", value: "Carol" }));
-    server.setContent("test-app", "team._order", JSON.stringify({ type: "order", value: ["abc12", "def34", "ghi56"] }));
+    server.setContent(
+        "test-app",
+        "team.abc12.name",
+        JSON.stringify({ type: "text", value: "Alice" }),
+    );
+    server.setContent(
+        "test-app",
+        "team.def34.name",
+        JSON.stringify({ type: "text", value: "Bob" }),
+    );
+    server.setContent(
+        "test-app",
+        "team.ghi56.name",
+        JSON.stringify({ type: "text", value: "Carol" }),
+    );
+    server.setContent(
+        "test-app",
+        "team._order",
+        JSON.stringify({ type: "order", value: ["abc12", "def34", "ghi56"] }),
+    );
 
     await page.goto(testUrl);
     await page.waitForSelector("scms-toolbar");
@@ -981,9 +1385,21 @@ test("drag and drop reorders instances", async () => {
 
 test("drag and drop marks changes as unsaved", async () => {
     server.clearContent();
-    server.setContent("test-app", "team.abc12.name", JSON.stringify({ type: "text", value: "Alice" }));
-    server.setContent("test-app", "team.def34.name", JSON.stringify({ type: "text", value: "Bob" }));
-    server.setContent("test-app", "team._order", JSON.stringify({ type: "order", value: ["abc12", "def34"] }));
+    server.setContent(
+        "test-app",
+        "team.abc12.name",
+        JSON.stringify({ type: "text", value: "Alice" }),
+    );
+    server.setContent(
+        "test-app",
+        "team.def34.name",
+        JSON.stringify({ type: "text", value: "Bob" }),
+    );
+    server.setContent(
+        "test-app",
+        "team._order",
+        JSON.stringify({ type: "order", value: ["abc12", "def34"] }),
+    );
 
     await page.goto(testUrl);
     await page.waitForSelector("scms-toolbar");

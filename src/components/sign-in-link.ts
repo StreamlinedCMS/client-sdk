@@ -19,7 +19,7 @@ export class SignInLink extends LitElement {
             new CustomEvent("sign-in-click", {
                 bubbles: true,
                 composed: true,
-            })
+            }),
         );
     }
 
@@ -28,7 +28,7 @@ export class SignInLink extends LitElement {
             <div class="text-center py-5 mt-10 text-xs">
                 <a
                     class="text-gray-500 no-underline cursor-pointer hover:underline"
-                    @click="${this.handleClick}"
+                    @click=${this.handleClick}
                 >
                     Sign In
                 </a>

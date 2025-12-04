@@ -102,7 +102,7 @@ export class PopupConnection<TResult> {
             const popup = window.open(
                 url,
                 name,
-                `width=${width},height=${height},left=${left},top=${top},popup=yes`
+                `width=${width},height=${height},left=${left},top=${top},popup=yes`,
             );
 
             if (!popup) {

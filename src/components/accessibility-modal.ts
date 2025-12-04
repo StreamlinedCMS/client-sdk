@@ -225,7 +225,7 @@ export class AccessibilityModal extends LitElement {
                 detail: { attributes: this.editedAttributes },
                 bubbles: true,
                 composed: true,
-            })
+            }),
         );
     }
 
@@ -238,7 +238,7 @@ export class AccessibilityModal extends LitElement {
             new CustomEvent("cancel", {
                 bubbles: true,
                 composed: true,
-            })
+            }),
         );
     }
 
@@ -288,10 +288,13 @@ export class AccessibilityModal extends LitElement {
                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400 bg-white"
                               .value=${value}
                               @change=${(e: Event) =>
-                                  this.handleInput(field.name, (e.target as HTMLSelectElement).value)}
+                                  this.handleInput(
+                                      field.name,
+                                      (e.target as HTMLSelectElement).value,
+                                  )}
                           >
                               ${field.options?.map(
-                                  (opt) => html`<option value=${opt.value}>${opt.label}</option>`
+                                  (opt) => html`<option value=${opt.value}>${opt.label}</option>`,
                               )}
                           </select>
                       `
@@ -301,7 +304,10 @@ export class AccessibilityModal extends LitElement {
                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400"
                               .value=${value}
                               @input=${(e: Event) =>
-                                  this.handleInput(field.name, (e.target as HTMLInputElement).value)}
+                                  this.handleInput(
+                                      field.name,
+                                      (e.target as HTMLInputElement).value,
+                                  )}
                               placeholder=${field.placeholder || ""}
                           />
                       `}
@@ -312,13 +318,13 @@ export class AccessibilityModal extends LitElement {
 
     render() {
         const primaryFields = ACCESSIBILITY_FIELDS.filter(
-            (f) => f.priority[this.elementType] === "primary"
+            (f) => f.priority[this.elementType] === "primary",
         );
         const secondaryFields = ACCESSIBILITY_FIELDS.filter(
-            (f) => f.priority[this.elementType] === "secondary"
+            (f) => f.priority[this.elementType] === "secondary",
         );
         const notApplicableFields = ACCESSIBILITY_FIELDS.filter(
-            (f) => f.priority[this.elementType] === "not-applicable"
+            (f) => f.priority[this.elementType] === "not-applicable",
         );
 
         return html`
@@ -331,7 +337,9 @@ export class AccessibilityModal extends LitElement {
                 <div class="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
                     <div class="flex items-center gap-2">
                         <span class="text-sm font-medium text-gray-900">Accessibility</span>
-                        <span class="text-xs font-mono text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+                        <span
+                            class="text-xs font-mono text-gray-500 bg-gray-100 px-2 py-0.5 rounded"
+                        >
                             ${this.elementId}
                         </span>
                     </div>
@@ -366,10 +374,12 @@ export class AccessibilityModal extends LitElement {
                                   <button
                                       type="button"
                                       class="not-applicable-toggle"
-                                      @click=${() => (this.showNotApplicable = !this.showNotApplicable)}
+                                      @click=${() =>
+                                          (this.showNotApplicable = !this.showNotApplicable)}
                                   >
                                       <svg
-                                          class="w-4 h-4 transition-transform ${this.showNotApplicable
+                                          class="w-4 h-4 transition-transform ${this
+                                              .showNotApplicable
                                               ? "rotate-90"
                                               : ""}"
                                           fill="none"
@@ -389,7 +399,7 @@ export class AccessibilityModal extends LitElement {
                                       ? html`
                                             <div class="not-applicable-section mt-3 space-y-4">
                                                 ${notApplicableFields.map((field) =>
-                                                    this.renderField(field)
+                                                    this.renderField(field),
                                                 )}
                                             </div>
                                         `
@@ -400,7 +410,9 @@ export class AccessibilityModal extends LitElement {
                 </div>
 
                 <!-- Footer -->
-                <div class="px-4 py-3 border-t border-gray-200 flex items-center justify-between bg-gray-50">
+                <div
+                    class="px-4 py-3 border-t border-gray-200 flex items-center justify-between bg-gray-50"
+                >
                     <span class="text-xs text-gray-500">
                         <kbd class="px-1.5 py-0.5 bg-gray-200 rounded text-gray-600">⌘</kbd>
                         <kbd class="px-1.5 py-0.5 bg-gray-200 rounded text-gray-600">Enter</kbd>
