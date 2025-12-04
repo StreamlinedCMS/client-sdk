@@ -87,9 +87,9 @@ export class AttributesModal extends LitElement {
 
             .attribute-row {
                 display: grid;
-                grid-template-columns: 1fr 1fr auto;
+                grid-template-columns: 2fr 3fr auto;
                 gap: 8px;
-                align-items: start;
+                align-items: center;
             }
 
             @media (max-width: 480px) {
@@ -134,21 +134,18 @@ export class AttributesModal extends LitElement {
             }
 
             .add-form {
-                display: flex;
+                display: grid;
+                grid-template-columns: 2fr 3fr auto;
                 gap: 8px;
             }
 
             @media (max-width: 480px) {
                 .add-form {
-                    flex-direction: column;
-                }
-
-                .add-form input {
-                    width: 100%;
+                    grid-template-columns: 1fr;
                 }
 
                 .add-form button {
-                    align-self: flex-end;
+                    justify-self: end;
                 }
             }
 

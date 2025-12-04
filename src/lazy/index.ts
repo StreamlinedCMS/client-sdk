@@ -94,6 +94,14 @@ interface TemplateInfo {
     instanceCount: number;
 }
 
+/**
+ * Content response from API
+ */
+interface ContentResponse {
+    elements: Record<string, { content: string }>;
+    groups: Record<string, { elements: Record<string, { content: string }> }>;
+}
+
 class EditorController {
     private config: ViewerConfig;
     private log: Logger;
@@ -131,6 +139,8 @@ class EditorController {
     // Track template UI elements for cleanup
     private templateAddButtons: Map<string, HTMLButtonElement> = new Map();
     private instanceDeleteButtons: WeakMap<HTMLElement, HTMLButtonElement> = new WeakMap();
+    // Keys that have saved content from API (used to skip whitespace normalization)
+    private savedContentKeys: Set<string> = new Set();
 
     constructor(config: ViewerConfig) {
         this.config = config;
@@ -147,10 +157,49 @@ class EditorController {
         });
     }
 
+    /**
+     * Fetch content from API to determine which elements have saved content.
+     * Elements with saved content should not have their whitespace normalized.
+     */
+    private async fetchSavedContentKeys(): Promise<void> {
+        try {
+            const url = `${this.config.apiUrl}/apps/${this.config.appId}/content`;
+            const response = await fetch(url);
+
+            if (!response.ok) {
+                // No content or error - all elements will be normalized
+                return;
+            }
+
+            const data = await response.json() as ContentResponse;
+
+            // Collect all keys that have saved content
+            // Ungrouped elements
+            for (const elementId of Object.keys(data.elements)) {
+                this.savedContentKeys.add(elementId);
+            }
+
+            // Grouped elements (key format: groupId:elementId)
+            for (const [groupId, group] of Object.entries(data.groups)) {
+                for (const elementId of Object.keys(group.elements)) {
+                    this.savedContentKeys.add(`${groupId}:${elementId}`);
+                }
+            }
+
+            this.log.debug("Fetched saved content keys", { count: this.savedContentKeys.size });
+        } catch (error) {
+            this.log.warn("Could not fetch saved content keys", error);
+        }
+    }
+
     async init(): Promise<void> {
         this.log.info("Lazy module initializing", {
             appId: this.config.appId,
         });
+
+        // Fetch saved content to know which elements have user-saved data
+        // (we don't normalize whitespace for those - only for initial DOM content)
+        await this.fetchSavedContentKeys();
 
         // Re-scan editable elements (viewer already populated them)
         this.scanEditableElements();
@@ -289,7 +338,11 @@ class EditorController {
                     // Initialize content state from DOM (first element for this key)
                     // Type must be set before getElementContent is called
                     this.editableTypes.set(key, info.type);
-                    const content = this.getElementContent(key, elementInfo);
+
+                    // Only normalize whitespace for elements without saved content
+                    // (to clean up DOM formatting from source HTML, but preserve user intent)
+                    const hasSavedContent = this.savedContentKeys.has(key);
+                    const content = this.getElementContent(key, elementInfo, !hasSavedContent);
                     this.originalContent.set(key, content);
                     this.currentContent.set(key, content);
                 }
@@ -477,6 +530,12 @@ class EditorController {
         this.stopEditing();
     };
 
+    private handleBeforeUnload = (e: BeforeUnloadEvent): void => {
+        if (this.hasUnsavedChanges()) {
+            e.preventDefault();
+        }
+    };
+
     private async handleSignIn(): Promise<void> {
         this.log.debug("Opening login popup");
 
@@ -585,6 +644,9 @@ class EditorController {
         // Add click-outside handler to deselect elements
         document.addEventListener("click", this.handleDocumentClick);
 
+        // Warn before leaving page with unsaved changes
+        window.addEventListener("beforeunload", this.handleBeforeUnload);
+
         this.injectEditStyles();
         this.showTemplateControls();
         this.showToolbar();
@@ -602,6 +664,9 @@ class EditorController {
 
         // Remove click-outside handler
         document.removeEventListener("click", this.handleDocumentClick);
+
+        // Remove beforeunload handler
+        window.removeEventListener("beforeunload", this.handleBeforeUnload);
 
         this.hideTemplateControls();
         this.stopEditing();
@@ -752,6 +817,11 @@ class EditorController {
     }
 
     private signOut(): void {
+        if (this.hasUnsavedChanges()) {
+            const confirmed = confirm("You have unsaved changes. Sign out anyway?");
+            if (!confirmed) return;
+        }
+
         this.log.info("Signing out");
 
         this.keyStorage.clearStoredKey();
@@ -790,7 +860,7 @@ class EditorController {
         style.textContent = `
             .streamlined-editable {
                 outline: 2px dashed transparent;
-                outline-offset: 2px;
+                outline-offset: -2px;
                 transition: outline 0.2s;
                 cursor: pointer;
                 position: relative;
@@ -800,41 +870,46 @@ class EditorController {
                 outline-color: #ef4444;
             }
 
+            .streamlined-editable:empty::before {
+                content: "Click to edit";
+                color: #9ca3af;
+                font-style: italic;
+            }
+
             .streamlined-editing {
                 outline: 2px solid #ef4444;
-                outline-offset: 2px;
+                outline-offset: -2px;
             }
 
             .streamlined-editing-sibling {
                 outline: 2px solid #fca5a5;
-                outline-offset: 2px;
+                outline-offset: -2px;
             }
 
             /* Template instance controls */
             .scms-instance-delete {
                 position: absolute;
-                top: -8px;
-                right: -8px;
-                width: 24px;
-                height: 24px;
+                top: 4px;
+                right: 4px;
+                width: 28px;
+                height: 28px;
                 border-radius: 50%;
-                background: #ef4444;
+                background: rgba(0, 0, 0, 0.4);
                 color: white;
-                border: 2px solid white;
-                font-size: 16px;
+                border: none;
+                font-size: 18px;
                 line-height: 1;
                 cursor: pointer;
                 opacity: 0;
-                transition: opacity 0.2s;
+                transition: opacity 0.2s, background 0.2s;
                 z-index: 10;
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.2);
             }
 
             .scms-instance-delete:hover {
-                background: #dc2626;
+                background: rgba(0, 0, 0, 0.6);
             }
 
             [data-scms-instance]:hover > .scms-instance-delete {
@@ -1020,8 +1095,12 @@ class EditorController {
      * Get the current content value for an element based on its type
      * Returns JSON string with type field for all element types
      * Includes attributes if any have been set
+     *
+     * @param normalizeWhitespace If true, normalize whitespace in text/html content.
+     *        Should only be true during initial scan to clean up DOM formatting whitespace.
+     *        Should be false when capturing user edits to preserve their intent.
      */
-    private getElementContent(key: string, info: EditableElementInfo): string {
+    private getElementContent(key: string, info: EditableElementInfo, normalizeWs = false): string {
         const elementType = this.getEditableType(key);
         const attributes = this.elementAttributes.get(key);
 
@@ -1033,26 +1112,29 @@ class EditorController {
             };
             return JSON.stringify(data);
         } else if (elementType === "link" && info.element instanceof HTMLAnchorElement) {
+            const text = info.element.textContent || "";
             const data: LinkContentData = {
                 type: "link",
                 href: info.element.href,
                 target: info.element.target,
-                text: info.element.textContent || "",
+                text: normalizeWs ? this.normalizeWhitespace(text) : text,
                 ...(attributes && Object.keys(attributes).length > 0 ? { attributes } : {}),
             };
             return JSON.stringify(data);
         } else if (elementType === "text") {
+            const value = info.element.textContent || "";
             const data: TextContentData = {
                 type: "text",
-                value: info.element.textContent || "",
+                value: normalizeWs ? this.normalizeWhitespace(value) : value,
                 ...(attributes && Object.keys(attributes).length > 0 ? { attributes } : {}),
             };
             return JSON.stringify(data);
         } else {
             // html (default)
+            const value = info.element.innerHTML;
             const data: HtmlContentData = {
                 type: "html",
-                value: info.element.innerHTML,
+                value: normalizeWs ? this.normalizeHtmlWhitespace(value) : value,
                 ...(attributes && Object.keys(attributes).length > 0 ? { attributes } : {}),
             };
             return JSON.stringify(data);
@@ -1406,10 +1488,24 @@ class EditorController {
         const primaryInfo = infos[0];
         this.log.debug("Opening HTML editor", { key, elementId: primaryInfo.elementId });
 
+        // Get content from currentContent (already normalized) rather than DOM
+        let htmlValue = primaryInfo.element.innerHTML;
+        const storedContent = this.currentContent.get(key);
+        if (storedContent) {
+            try {
+                const data = JSON.parse(storedContent) as { type?: string; value?: string };
+                if (data.type === "html" && data.value !== undefined) {
+                    htmlValue = data.value;
+                }
+            } catch {
+                // Use DOM fallback
+            }
+        }
+
         // Create and show modal
         const modal = document.createElement("scms-html-editor-modal") as HtmlEditorModal;
         modal.elementId = primaryInfo.elementId;
-        modal.content = primaryInfo.element.innerHTML;
+        modal.content = htmlValue;
 
         // Prevent clicks inside modal from deselecting the element
         modal.addEventListener("click", (e: Event) => {
@@ -1550,6 +1646,27 @@ class EditorController {
     private static readonly ELEMENT_ATTRIBUTES = ['src', 'href', 'target'];
 
     /**
+     * Normalize whitespace in text content from DOM.
+     * Collapses multiple whitespace characters (including newlines from HTML formatting)
+     * into single spaces and trims leading/trailing whitespace.
+     */
+    private normalizeWhitespace(text: string): string {
+        return text.replace(/\s+/g, ' ').trim();
+    }
+
+    /**
+     * Normalize HTML whitespace from DOM innerHTML.
+     * Collapses runs of whitespace between tags into single spaces,
+     * and trims leading/trailing whitespace.
+     */
+    private normalizeHtmlWhitespace(html: string): string {
+        return html
+            .replace(/>\s+</g, '> <')
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
+
+    /**
      * Get attributes from the DOM element, split into element attrs and other attrs.
      * Element attrs are core attributes (src, href, target).
      * Other attrs are everything else (dynamic, extensions, etc).
@@ -1582,6 +1699,32 @@ class EditorController {
         return { elementAttrs, otherAttrs };
     }
 
+    /**
+     * Get merged attributes for modals: DOM attributes as defaults, stored attributes take precedence.
+     * Only includes attributes matching the provided filter (e.g., SEO or accessibility attribute names).
+     */
+    private getMergedAttributes(key: string, element: HTMLElement, attributeFilter?: string[]): ElementAttributes {
+        const { otherAttrs } = this.getDomAttributes(element);
+        const storedAttrs = this.getElementAttributes(key);
+
+        // Start with DOM attributes (filtered if filter provided)
+        const domDefaults: ElementAttributes = {};
+        for (const [name, value] of Object.entries(otherAttrs)) {
+            if (!attributeFilter || attributeFilter.includes(name)) {
+                domDefaults[name] = value;
+            }
+        }
+
+        // Merge stored attributes on top (they take precedence)
+        return { ...domDefaults, ...storedAttrs };
+    }
+
+    /** SEO-related attribute names */
+    private static readonly SEO_ATTRIBUTES = ['alt', 'title', 'rel'];
+
+    /** Accessibility-related attribute names */
+    private static readonly ACCESSIBILITY_ATTRIBUTES = ['aria-label', 'aria-describedby', 'role', 'tabindex'];
+
     private handleEditSeo(): void {
         if (!this.editingKey) {
             this.log.debug("No element selected for SEO editing");
@@ -1604,7 +1747,8 @@ class EditorController {
         const modal = document.createElement("scms-seo-modal") as SeoModal;
         modal.elementId = primaryInfo.elementId;
         modal.elementType = elementType;
-        modal.elementAttrs = this.getElementAttributes(key);
+        // Merge DOM attributes (as defaults) with stored attributes (take precedence)
+        modal.elementAttrs = this.getMergedAttributes(key, primaryInfo.element, EditorController.SEO_ATTRIBUTES);
 
         modal.addEventListener("click", (e: Event) => e.stopPropagation());
 
@@ -1654,7 +1798,8 @@ class EditorController {
         const modal = document.createElement("scms-accessibility-modal") as AccessibilityModal;
         modal.elementId = primaryInfo.elementId;
         modal.elementType = elementType;
-        modal.elementAttrs = this.getElementAttributes(key);
+        // Merge DOM attributes (as defaults) with stored attributes (take precedence)
+        modal.elementAttrs = this.getMergedAttributes(key, primaryInfo.element, EditorController.ACCESSIBILITY_ATTRIBUTES);
 
         modal.addEventListener("click", (e: Event) => e.stopPropagation());
 
