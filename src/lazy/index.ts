@@ -10,6 +10,7 @@
  */
 
 import { Logger } from "loganite";
+import Sortable from "sortablejs";
 import { KeyStorage, type EditorMode } from "../key-storage.js";
 import { PopupManager, type MediaFile } from "../popup-manager.js";
 import type { EditableType, ContentData, TextContentData, HtmlContentData, ImageContentData, LinkContentData } from "../types.js";
@@ -139,6 +140,7 @@ class EditorController {
     // Track template UI elements for cleanup
     private templateAddButtons: Map<string, HTMLButtonElement> = new Map();
     private instanceDeleteButtons: WeakMap<HTMLElement, HTMLButtonElement> = new WeakMap();
+    private sortableInstances: Map<string, Sortable> = new Map();
     // Keys that have saved content from API (used to skip whitespace normalization)
     private savedContentKeys: Set<string> = new Set();
 
@@ -699,19 +701,28 @@ class EditorController {
             this.templateAddButtons.set(templateId, addBtn);
         });
 
-        // Add delete buttons to existing instances (except instance 0 when it's the only one)
-        this.templates.forEach((templateInfo) => {
+        // Add delete buttons and drag handles to existing instances
+        this.templates.forEach((templateInfo, templateId) => {
             const { container } = templateInfo;
             container.querySelectorAll<HTMLElement>("[data-scms-instance]").forEach((instanceElement) => {
                 if (!this.instanceDeleteButtons.has(instanceElement)) {
                     this.addInstanceDeleteButton(instanceElement);
                 }
+                // Add drag handle if multiple instances
+                if (templateInfo.instanceCount > 1) {
+                    this.addInstanceDragHandle(instanceElement);
+                }
             });
+
+            // Initialize SortableJS for drag-and-drop reordering
+            if (!this.sortableInstances.has(templateId) && templateInfo.instanceCount > 1) {
+                this.initializeSortable(templateId, container);
+            }
         });
     }
 
     /**
-     * Hide template add buttons and instance delete buttons
+     * Hide template add buttons, delete buttons, drag handles, and destroy sortable instances
      */
     private hideTemplateControls(): void {
         // Remove all add buttons
@@ -720,17 +731,27 @@ class EditorController {
         });
         this.templateAddButtons.clear();
 
-        // Remove all delete buttons
+        // Remove all delete buttons and drag handles
         this.templates.forEach((templateInfo) => {
             const { container } = templateInfo;
             container.querySelectorAll<HTMLElement>("[data-scms-instance]").forEach((instanceElement) => {
                 const deleteBtn = this.instanceDeleteButtons.get(instanceElement);
                 if (deleteBtn) {
                     deleteBtn.remove();
-                    // WeakMap will clean up automatically when instanceElement is removed
+                }
+                // Remove drag handle
+                const dragHandle = instanceElement.querySelector(".scms-instance-drag-handle");
+                if (dragHandle) {
+                    dragHandle.remove();
                 }
             });
         });
+
+        // Destroy all sortable instances
+        this.sortableInstances.forEach((sortable) => {
+            sortable.destroy();
+        });
+        this.sortableInstances.clear();
     }
 
     private showToolbar(): void {
@@ -959,6 +980,56 @@ class EditorController {
             .scms-template-add svg {
                 width: 16px;
                 height: 16px;
+            }
+
+            /* Drag handle for reordering */
+            .scms-instance-drag-handle {
+                position: absolute;
+                top: 4px;
+                left: 4px;
+                width: 24px;
+                height: 24px;
+                border-radius: 4px;
+                background: transparent;
+                color: rgba(0, 0, 0, 0.4);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                cursor: grab;
+                opacity: 0;
+                transition: opacity 0.2s, background 0.2s, color 0.2s;
+                z-index: 10;
+            }
+
+            .scms-instance-drag-handle:hover {
+                background: rgba(0, 0, 0, 0.1);
+                color: rgba(0, 0, 0, 0.6);
+            }
+
+            .scms-instance-drag-handle:active {
+                cursor: grabbing;
+            }
+
+            [data-scms-instance]:hover > .scms-instance-drag-handle {
+                opacity: 1;
+            }
+
+            .scms-instance-drag-handle svg {
+                width: 16px;
+                height: 16px;
+            }
+
+            /* SortableJS classes */
+            .scms-sortable-ghost {
+                opacity: 0.4;
+            }
+
+            .scms-sortable-chosen {
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            }
+
+            .scms-sortable-drag {
+                opacity: 1;
             }
         `;
         document.head.appendChild(style);
@@ -2018,6 +2089,17 @@ class EditorController {
 
         this.log.debug("Added template instance", { templateId, instanceId: newInstanceId });
 
+        // If we now have 2+ instances, add delete buttons and drag handles to all instances
+        if (templateInfo.instanceCount >= 2 && this.currentMode === "author") {
+            container.querySelectorAll<HTMLElement>("[data-scms-instance]").forEach((instanceElement) => {
+                this.addInstanceDeleteButton(instanceElement);
+                this.addInstanceDragHandle(instanceElement);
+            });
+            if (!this.sortableInstances.has(templateId)) {
+                this.initializeSortable(templateId, container);
+            }
+        }
+
         // Mark as having unsaved changes (order array will be saved with other changes)
         this.updateToolbarHasChanges();
 
@@ -2100,6 +2182,22 @@ class EditorController {
         this.updateToolbarHasChanges();
 
         this.log.debug("Removed template instance", { templateId, instanceId });
+
+        // If we're down to 1 instance, remove delete buttons and drag handles from remaining instance
+        if (templateInfo.instanceCount === 1) {
+            container.querySelectorAll<HTMLElement>("[data-scms-instance]").forEach((el) => {
+                const deleteBtn = el.querySelector(".scms-instance-delete");
+                if (deleteBtn) deleteBtn.remove();
+                const dragHandle = el.querySelector(".scms-instance-drag-handle");
+                if (dragHandle) dragHandle.remove();
+            });
+            // Destroy sortable instance
+            const sortable = this.sortableInstances.get(templateId);
+            if (sortable) {
+                sortable.destroy();
+                this.sortableInstances.delete(templateId);
+            }
+        }
 
         // Update toolbar
         this.updateToolbarTemplateContext();
@@ -2335,6 +2433,76 @@ class EditorController {
 
         instanceElement.appendChild(deleteBtn);
         this.instanceDeleteButtons.set(instanceElement, deleteBtn);
+    }
+
+    /**
+     * Add drag handle to a template instance for reordering
+     */
+    private addInstanceDragHandle(instanceElement: HTMLElement): void {
+        // Don't add if already has one
+        if (instanceElement.querySelector(".scms-instance-drag-handle")) return;
+
+        const dragHandle = document.createElement("div");
+        dragHandle.className = "scms-instance-drag-handle";
+        // 3x3 dot grip icon (like Lucide's grip icon)
+        dragHandle.innerHTML = `
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                <circle cx="6" cy="6" r="1.5"/>
+                <circle cx="12" cy="6" r="1.5"/>
+                <circle cx="18" cy="6" r="1.5"/>
+                <circle cx="6" cy="12" r="1.5"/>
+                <circle cx="12" cy="12" r="1.5"/>
+                <circle cx="18" cy="12" r="1.5"/>
+                <circle cx="6" cy="18" r="1.5"/>
+                <circle cx="12" cy="18" r="1.5"/>
+                <circle cx="18" cy="18" r="1.5"/>
+            </svg>
+        `;
+        dragHandle.title = "Drag to reorder";
+
+        instanceElement.appendChild(dragHandle);
+    }
+
+    /**
+     * Initialize SortableJS on a template container for drag-and-drop reordering
+     */
+    private initializeSortable(templateId: string, container: HTMLElement): void {
+        const sortable = Sortable.create(container, {
+            animation: 150,
+            handle: ".scms-instance-drag-handle",
+            draggable: "[data-scms-instance]",
+            ghostClass: "scms-sortable-ghost",
+            chosenClass: "scms-sortable-chosen",
+            dragClass: "scms-sortable-drag",
+            filter: ".scms-template-add", // Don't drag the add button
+            onEnd: (evt) => {
+                const { oldIndex, newIndex } = evt;
+                if (oldIndex === undefined || newIndex === undefined || oldIndex === newIndex) {
+                    return;
+                }
+
+                // SortableJS already moved the DOM element, but we need to update our tracking
+                const templateInfo = this.templates.get(templateId);
+                if (!templateInfo) return;
+
+                // Update the instanceIds array to match the new DOM order
+                const [movedId] = templateInfo.instanceIds.splice(oldIndex, 1);
+                templateInfo.instanceIds.splice(newIndex, 0, movedId);
+
+                // Update order in content
+                this.updateOrderContent(templateId, templateInfo);
+
+                // Mark as having unsaved changes
+                this.updateToolbarHasChanges();
+
+                // Update toolbar context if editing an element in this template
+                this.updateToolbarTemplateContext();
+
+                this.log.debug("Reordered via drag-and-drop", { templateId, oldIndex, newIndex });
+            },
+        });
+
+        this.sortableInstances.set(templateId, sortable);
     }
 
     /**

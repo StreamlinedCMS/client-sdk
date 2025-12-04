@@ -901,3 +901,108 @@ test("reorder is saved and persists after reload", async () => {
     expect(await reloadedMembers.nth(0).locator('[data-scms-text="name"]').textContent()).toBe("Bob");
     expect(await reloadedMembers.nth(1).locator('[data-scms-text="name"]').textContent()).toBe("Alice");
 });
+
+// Drag-and-drop reordering tests
+
+test("drag handle appears on instance hover when multiple instances exist", async () => {
+    server.clearContent();
+    server.setContent("test-app", "team.abc12.name", JSON.stringify({ type: "text", value: "Alice" }));
+    server.setContent("test-app", "team.def34.name", JSON.stringify({ type: "text", value: "Bob" }));
+    server.setContent("test-app", "team._order", JSON.stringify({ type: "order", value: ["abc12", "def34"] }));
+
+    await page.goto(testUrl);
+    await page.waitForSelector("scms-toolbar");
+
+    const teamMembers = page.locator('[data-scms-template="team"] .team-member');
+
+    // Hover over first instance
+    await teamMembers.nth(0).hover();
+
+    // Drag handle should become visible
+    const dragHandle = teamMembers.nth(0).locator(".scms-instance-drag-handle");
+    await page.waitForFunction(() => {
+        const handle = document.querySelector('[data-scms-template="team"] .team-member .scms-instance-drag-handle');
+        return handle && window.getComputedStyle(handle).opacity === "1";
+    }, { timeout: 2000 });
+
+    expect(await dragHandle.isVisible()).toBe(true);
+});
+
+test("drag handle does not appear for single instance", async () => {
+    server.clearContent();
+    server.setContent("test-app", "team.abc12.name", JSON.stringify({ type: "text", value: "Alice" }));
+    server.setContent("test-app", "team._order", JSON.stringify({ type: "order", value: ["abc12"] }));
+
+    await page.goto(testUrl);
+    await page.waitForSelector("scms-toolbar");
+
+    const teamMembers = page.locator('[data-scms-template="team"] .team-member');
+
+    // Hover over the only instance
+    await teamMembers.nth(0).hover();
+
+    // Drag handle should not exist
+    const dragHandle = teamMembers.nth(0).locator(".scms-instance-drag-handle");
+    expect(await dragHandle.count()).toBe(0);
+});
+
+test("drag and drop reorders instances", async () => {
+    server.clearContent();
+    server.setContent("test-app", "team.abc12.name", JSON.stringify({ type: "text", value: "Alice" }));
+    server.setContent("test-app", "team.def34.name", JSON.stringify({ type: "text", value: "Bob" }));
+    server.setContent("test-app", "team.ghi56.name", JSON.stringify({ type: "text", value: "Carol" }));
+    server.setContent("test-app", "team._order", JSON.stringify({ type: "order", value: ["abc12", "def34", "ghi56"] }));
+
+    await page.goto(testUrl);
+    await page.waitForSelector("scms-toolbar");
+
+    const teamMembers = page.locator('[data-scms-template="team"] .team-member');
+
+    // Verify initial order
+    expect(await teamMembers.nth(0).locator('[data-scms-text="name"]').textContent()).toBe("Alice");
+    expect(await teamMembers.nth(1).locator('[data-scms-text="name"]').textContent()).toBe("Bob");
+    expect(await teamMembers.nth(2).locator('[data-scms-text="name"]').textContent()).toBe("Carol");
+
+    // Get the drag handle of the third instance (Carol)
+    const thirdDragHandle = teamMembers.nth(2).locator(".scms-instance-drag-handle");
+    const firstInstance = teamMembers.nth(0);
+
+    // Drag Carol to the first position
+    await thirdDragHandle.dragTo(firstInstance, { targetPosition: { x: 50, y: 10 } });
+
+    // Wait for reorder to complete
+    await page.waitForTimeout(200);
+
+    // Order should now be Carol, Alice, Bob
+    expect(await teamMembers.nth(0).locator('[data-scms-text="name"]').textContent()).toBe("Carol");
+    expect(await teamMembers.nth(1).locator('[data-scms-text="name"]').textContent()).toBe("Alice");
+    expect(await teamMembers.nth(2).locator('[data-scms-text="name"]').textContent()).toBe("Bob");
+});
+
+test("drag and drop marks changes as unsaved", async () => {
+    server.clearContent();
+    server.setContent("test-app", "team.abc12.name", JSON.stringify({ type: "text", value: "Alice" }));
+    server.setContent("test-app", "team.def34.name", JSON.stringify({ type: "text", value: "Bob" }));
+    server.setContent("test-app", "team._order", JSON.stringify({ type: "order", value: ["abc12", "def34"] }));
+
+    await page.goto(testUrl);
+    await page.waitForSelector("scms-toolbar");
+
+    const teamMembers = page.locator('[data-scms-template="team"] .team-member');
+
+    // Save button should not be visible initially
+    let saveButton = page.locator("scms-toolbar").locator("button:has-text('Save')");
+    expect(await saveButton.count()).toBe(0);
+
+    // Drag second instance to first position
+    const secondDragHandle = teamMembers.nth(1).locator(".scms-instance-drag-handle");
+    const firstInstance = teamMembers.nth(0);
+    await secondDragHandle.dragTo(firstInstance, { targetPosition: { x: 50, y: 10 } });
+
+    // Wait for reorder
+    await page.waitForTimeout(200);
+
+    // Save button should now be visible
+    saveButton = page.locator("scms-toolbar").locator("button:has-text('Save')");
+    expect(await saveButton.isVisible()).toBe(true);
+});
