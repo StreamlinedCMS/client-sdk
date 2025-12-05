@@ -338,13 +338,8 @@ export class Toolbar extends LitElement {
     }
 
     private renderEditHtmlButton() {
-        // Show for html and text types (not for image or link)
-        if (
-            !this.activeElement ||
-            this.activeElementType === "image" ||
-            this.activeElementType === "link"
-        )
-            return nothing;
+        // Show only for html type (not for text, image, or link)
+        if (!this.activeElement || this.activeElementType !== "html") return nothing;
         return html`
             <button
                 class="px-3 py-1.5 text-xs font-medium text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
@@ -578,6 +573,7 @@ export class Toolbar extends LitElement {
     private renderActiveElement() {
         return html`<scms-element-badge
             element-id=${this.activeElement || ""}
+            element-type=${this.activeElementType || ""}
         ></scms-element-badge>`;
     }
 
@@ -685,23 +681,31 @@ export class Toolbar extends LitElement {
                 `;
             }
 
-            // Text/HTML types
-            return html`
-                <button
-                    class="w-full px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-white transition-colors"
-                    @click=${this.handleEditHtml}
-                >
-                    Edit HTML
-                </button>
-            `;
+            if (this.activeElementType === "html") {
+                return html`
+                    <button
+                        class="w-full px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-white transition-colors"
+                        @click=${this.handleEditHtml}
+                    >
+                        Edit HTML
+                    </button>
+                `;
+            }
+
+            // Text type - no actions, just inline editing
+            return nothing;
         };
+
+        // Don't show Element section if there's no content (text type)
+        const content = renderContent();
+        if (content === nothing) return nothing;
 
         return html`
             <div
                 class="mobile-section mb-4 pb-4 border-b border-gray-200 bg-gray-50 -mx-4 px-4 py-3"
             >
                 ${this.renderMobileSectionHeader("Element", "element")}
-                ${isCollapsed ? nothing : renderContent()}
+                ${isCollapsed ? nothing : content}
             </div>
         `;
     }

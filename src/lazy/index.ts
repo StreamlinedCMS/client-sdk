@@ -353,10 +353,14 @@ class EditorController {
                     // Type must be set before getElementContent is called
                     this.editableTypes.set(key, info.type);
 
-                    // Only normalize whitespace for elements without saved content
+                    // For elements without saved content, normalize whitespace in the DOM
                     // (to clean up DOM formatting from source HTML, but preserve user intent)
                     const hasSavedContent = this.savedContentKeys.has(key);
-                    const content = this.getElementContent(key, elementInfo, !hasSavedContent);
+                    if (!hasSavedContent) {
+                        this.normalizeDomWhitespace(elementInfo.element, info.type);
+                    }
+
+                    const content = this.getElementContent(key, elementInfo);
                     this.originalContent.set(key, content);
                     this.currentContent.set(key, content);
                 }
@@ -1281,15 +1285,12 @@ class EditorController {
     }
 
     /**
-     * Get the current content value for an element based on its type
-     * Returns JSON string with type field for all element types
-     * Includes attributes if any have been set
-     *
-     * @param normalizeWhitespace If true, normalize whitespace in text/html content.
-     *        Should only be true during initial scan to clean up DOM formatting whitespace.
-     *        Should be false when capturing user edits to preserve their intent.
+     * Get the current content value for an element based on its type.
+     * Returns JSON string with type field for all element types.
+     * Includes attributes if any have been set.
+     * Note: DOM whitespace should be normalized before calling this (via normalizeDomWhitespace).
      */
-    private getElementContent(key: string, info: EditableElementInfo, normalizeWs = false): string {
+    private getElementContent(key: string, info: EditableElementInfo): string {
         const elementType = this.getEditableType(key);
         const attributes = this.elementAttributes.get(key);
 
@@ -1301,29 +1302,26 @@ class EditorController {
             };
             return JSON.stringify(data);
         } else if (elementType === "link" && info.element instanceof HTMLAnchorElement) {
-            const text = info.element.textContent || "";
             const data: LinkContentData = {
                 type: "link",
                 href: info.element.href,
                 target: info.element.target,
-                text: normalizeWs ? this.normalizeWhitespace(text) : text,
+                text: info.element.textContent || "",
                 ...(attributes && Object.keys(attributes).length > 0 ? { attributes } : {}),
             };
             return JSON.stringify(data);
         } else if (elementType === "text") {
-            const value = info.element.textContent || "";
             const data: TextContentData = {
                 type: "text",
-                value: normalizeWs ? this.normalizeWhitespace(value) : value,
+                value: info.element.textContent || "",
                 ...(attributes && Object.keys(attributes).length > 0 ? { attributes } : {}),
             };
             return JSON.stringify(data);
         } else {
             // html (default)
-            const value = info.element.innerHTML;
             const data: HtmlContentData = {
                 type: "html",
-                value: normalizeWs ? this.normalizeHtmlWhitespace(value) : value,
+                value: info.element.innerHTML,
                 ...(attributes && Object.keys(attributes).length > 0 ? { attributes } : {}),
             };
             return JSON.stringify(data);
@@ -1715,7 +1713,7 @@ class EditorController {
         if (storedContent) {
             try {
                 const data = JSON.parse(storedContent) as { type?: string; value?: string };
-                if (data.type === "html" && data.value !== undefined) {
+                if ((data.type === "html" || data.type === "text") && data.value !== undefined) {
                     htmlValue = data.value;
                 }
             } catch {
@@ -1891,6 +1889,21 @@ class EditorController {
      */
     private normalizeHtmlWhitespace(html: string): string {
         return html.replace(/>\s+</g, "> <").replace(/\s+/g, " ").trim();
+    }
+
+    /**
+     * Normalize whitespace directly in the DOM for an element.
+     * Called on load for elements without saved content to clean up source HTML formatting.
+     */
+    private normalizeDomWhitespace(element: HTMLElement, type: EditableType): void {
+        if (type === "text") {
+            element.textContent = this.normalizeWhitespace(element.textContent || "");
+        } else if (type === "html") {
+            element.innerHTML = this.normalizeHtmlWhitespace(element.innerHTML);
+        } else if (type === "link" && element instanceof HTMLAnchorElement) {
+            element.textContent = this.normalizeWhitespace(element.textContent || "");
+        }
+        // image type doesn't need whitespace normalization
     }
 
     /**
