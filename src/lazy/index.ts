@@ -1526,8 +1526,9 @@ class EditorController {
                     throw new Error(`Delete ${key}: ${response.status} ${response.statusText}`);
                 }
 
-                // Remove from original content (currentContent already doesn't have it)
+                // Remove from tracking maps (currentContent already doesn't have it)
                 this.originalContent.delete(key);
+                this.savedContentKeys.delete(key);
                 deleted.push(key);
             });
 
