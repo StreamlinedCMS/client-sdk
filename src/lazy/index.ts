@@ -2519,10 +2519,24 @@ class EditorController {
                 existing.push(elementInfo);
             } else {
                 this.editableElements.set(key, [elementInfo]);
+
+                // Initialize content state from DOM (first element for this key)
+                // This mirrors what scanEditableElements does for initial elements
+                this.editableTypes.set(key, info.type);
+
+                // For new instance elements, normalize whitespace (no saved content exists yet)
+                this.normalizeDomWhitespace(element, info.type);
+
+                const content = this.getElementContent(key, elementInfo);
+                this.originalContent.set(key, content);
+                this.currentContent.set(key, content);
             }
 
             this.elementToKey.set(element, key);
-            this.editableTypes.set(key, info.type);
+            // Type may already be set above or from existing registration
+            if (!this.editableTypes.has(key)) {
+                this.editableTypes.set(key, info.type);
+            }
         });
     }
 

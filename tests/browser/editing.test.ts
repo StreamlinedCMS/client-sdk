@@ -765,6 +765,81 @@ test("new instance elements are editable", async () => {
     expect(await newName.textContent()).toBe("New Team Member");
 });
 
+test("new instance edits are saved and persist after reload", async () => {
+    server.clearContent();
+    server.setContent(
+        "test-app",
+        "team.abc12.name",
+        JSON.stringify({ type: "text", value: "Alice" }),
+    );
+    server.setContent(
+        "test-app",
+        "team._order",
+        JSON.stringify({ type: "order", value: ["abc12"] }),
+    );
+
+    await page.goto(testUrl);
+    await page.waitForSelector("scms-toolbar");
+
+    const teamContainer = page.locator('[data-scms-template="team"]');
+    let teamMembers = teamContainer.locator(".team-member");
+
+    // Initially 1 instance
+    expect(await teamMembers.count()).toBe(1);
+
+    // Add a new instance
+    await teamContainer.locator(".scms-template-add").click();
+    teamMembers = teamContainer.locator(".team-member");
+    expect(await teamMembers.count()).toBe(2);
+
+    // Edit the new instance's name
+    const newName = teamMembers.nth(1).locator('[data-scms-text="name"]');
+    await newName.click();
+    await newName.fill("New Team Member");
+
+    // Also edit the role
+    const newRole = teamMembers.nth(1).locator('[data-scms-text="role"]');
+    await newRole.click();
+    await newRole.fill("New Role");
+
+    // Save
+    const saveButton = page.locator("scms-toolbar").locator("button:has-text('Save')");
+    await saveButton.click();
+
+    // Wait for save to complete
+    await page.waitForFunction(
+        () => {
+            const el = document
+                .querySelectorAll('[data-scms-template="team"] .team-member')[1]
+                ?.querySelector('[data-scms-text="role"]');
+            return el && !el.classList.contains("streamlined-editing");
+        },
+        { timeout: 3000 },
+    );
+
+    // Reload and verify new instance content persisted
+    await page.reload();
+    await page.waitForSelector(".streamlined-editable");
+
+    const reloadedMembers = page.locator('[data-scms-template="team"] .team-member');
+
+    // Should still have 2 instances
+    expect(await reloadedMembers.count()).toBe(2);
+
+    // Original instance should be unchanged
+    expect(await reloadedMembers.nth(0).locator('[data-scms-text="name"]').textContent()).toBe(
+        "Alice",
+    );
+
+    // New instance content should have persisted
+    expect(await reloadedMembers.nth(1).locator('[data-scms-text="name"]').textContent()).toBe(
+        "New Team Member",
+    );
+    expect(await reloadedMembers.nth(1).locator('[data-scms-text="role"]').textContent()).toBe(
+        "New Role",
+    );
+});
+
 test("delete button appears on instance hover", async () => {
     server.clearContent();
     server.setContent(
