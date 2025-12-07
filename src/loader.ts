@@ -636,6 +636,19 @@
                     console.warn("[StreamlinedCMS] Domain not whitelisted for this app");
                     return null;
                 }
+                if (response.status === 402) {
+                    // Free plan - custom domains require upgrade
+                    try {
+                        const data = (await response.json()) as { error?: string; upgradeUrl?: string };
+                        console.warn(
+                            `[StreamlinedCMS] ${data.error || "Upgrade required"}`,
+                            data.upgradeUrl ? `\nUpgrade at: ${data.upgradeUrl}` : "",
+                        );
+                    } catch {
+                        console.warn("[StreamlinedCMS] Upgrade required to access from this domain");
+                    }
+                    return null;
+                }
                 throw new Error(`Failed to load content: ${response.status}`);
             }
 
