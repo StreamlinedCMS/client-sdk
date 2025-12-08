@@ -205,9 +205,10 @@ export class TestServer {
                     const url = new URL(req.url || "/", `http://localhost:${this.port}`);
                     const pathname = url.pathname;
 
-                    // Handle API requests first
-                    if (pathname.startsWith("/apps/")) {
-                        const handled = await this.handleApiRequest(req, res, pathname);
+                    // Handle API requests first (strip /v1 prefix like the real worker)
+                    if (pathname.startsWith("/v1/")) {
+                        const strippedPath = pathname.slice(3); // Remove "/v1"
+                        const handled = await this.handleApiRequest(req, res, strippedPath);
                         if (handled) return;
                     }
 
@@ -225,7 +226,7 @@ export class TestServer {
                         );
                         let html = await readFile(htmlPath, "utf-8");
                         // Replace template placeholder with actual API URL
-                        html = html.replace("{{API_URL}}", `http://localhost:${this.port}`);
+                        html = html.replace("{{API_URL}}", `http://localhost:${this.port}/v1`);
                         res.writeHead(200, { "Content-Type": "text/html" });
                         res.end(html);
                         return;

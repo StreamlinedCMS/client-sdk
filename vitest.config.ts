@@ -1,10 +1,12 @@
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
-    // Define build-time constants for tests (same as rollup.config.js)
+    // Build-time constants must be defined to avoid reference errors.
+    // Tests override these via data-api-url/data-app-url HTML attributes,
+    // so these values are never actually used at runtime.
     define: {
-        __SDK_API_URL__: JSON.stringify("https://api.streamlinedcms.com"),
-        __SDK_APP_URL__: JSON.stringify("https://app.streamlinedcms.com"),
+        __SDK_API_URL__: JSON.stringify("http://unused-in-tests"),
+        __SDK_APP_URL__: JSON.stringify("http://unused-in-tests"),
     },
     test: {
         environment: "jsdom",

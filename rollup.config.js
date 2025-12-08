@@ -5,31 +5,36 @@ import terser from "@rollup/plugin-terser";
 import postcss from "rollup-plugin-postcss";
 import { readFileSync, existsSync } from "fs";
 
-// Load environment variables from .env file based on mode
-// Usage: rollup -c --environment MODE:staging
-function loadEnv(mode) {
-    const envFile = mode ? `.env.${mode}` : ".env";
-    const env = {};
-
-    if (existsSync(envFile)) {
-        const content = readFileSync(envFile, "utf-8");
-        for (const line of content.split("\n")) {
-            const match = line.match(/^([^=]+)=(.*)$/);
-            if (match) {
-                env[match[1].trim()] = match[2].trim();
-            }
-        }
+// Load environment variables from .env file
+// SDK always builds with production values; use data-api-url in HTML to override
+function loadEnvFile(filename) {
+    if (!existsSync(filename)) {
+        throw new Error(`Missing ${filename} - create it with SDK_API_URL and SDK_APP_URL`);
     }
 
+    const env = {};
+    const content = readFileSync(filename, "utf-8");
+    for (const line of content.split("\n")) {
+        const match = line.match(/^([^=#]+)=(.*)$/);
+        if (match) {
+            env[match[1].trim()] = match[2].trim();
+        }
+    }
     return env;
 }
 
-const mode = process.env.MODE;
-const env = loadEnv(mode);
+const env = loadEnvFile(".env");
 
-// Get URLs from env or use defaults
-const SDK_API_URL = env.SDK_API_URL || "https://api.streamlinedcms.com";
-const SDK_APP_URL = env.SDK_APP_URL || "https://app.streamlinedcms.com";
+// Require SDK URLs to be defined
+const SDK_API_URL = env.SDK_API_URL;
+const SDK_APP_URL = env.SDK_APP_URL;
+
+if (!SDK_API_URL || !SDK_APP_URL) {
+    const missing = [];
+    if (!SDK_API_URL) missing.push("SDK_API_URL");
+    if (!SDK_APP_URL) missing.push("SDK_APP_URL");
+    throw new Error(`Missing required variables in .env: ${missing.join(", ")}`);
+}
 
 // Replace plugin config - substitutes build-time constants
 const replacePlugin = replace({
