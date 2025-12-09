@@ -13,7 +13,8 @@
   "scripts": {
     "build": "rollup -c",
     "build:staging": "MODE=staging rollup -c",
-    "deploy:staging": "npm run build:staging && wrangler pages deploy",
+    "deploy:staging": "npm run build:staging && wrangler pages deploy --project-name streamlined-cms-cdn-staging",
+    "deploy:PRODUCTION": "echo '⚠️  DEPLOYING TO PRODUCTION' && read -p 'Type YES to continue: ' c && [ \"$c\" = 'YES' ] && npm run build && wrangler pages deploy --project-name streamlined-cms-cdn",
     "dev": "rollup -c -w",
     "demo": "npm run build && ln -sfn ../dist demo/dist && vite --config vite.demo.config.ts --host",
     "test": "vitest run",
