@@ -7,6 +7,7 @@ export default defineConfig({
     define: {
         __SDK_API_URL__: JSON.stringify("http://unused-in-tests"),
         __SDK_APP_URL__: JSON.stringify("http://unused-in-tests"),
+        __SDK_VERSION__: JSON.stringify("0.0.0-test"),
     },
     test: {
         environment: "jsdom",

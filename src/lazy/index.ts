@@ -112,6 +112,12 @@ interface ContentResponse {
 }
 
 class EditorController {
+    static readonly version: string = __SDK_VERSION__;
+
+    get version(): string {
+        return EditorController.version;
+    }
+
     private config: ViewerConfig;
     private log: Logger;
     private keyStorage: KeyStorage;

@@ -5,6 +5,10 @@ import terser from "@rollup/plugin-terser";
 import postcss from "rollup-plugin-postcss";
 import { readFileSync, existsSync } from "fs";
 
+// Read version from package.json
+const pkg = JSON.parse(readFileSync("./package.json", "utf-8"));
+const SDK_VERSION = pkg.version;
+
 // Load environment variables from .env file
 // SDK always builds with production values; use data-api-url in HTML to override
 function loadEnvFile(filename) {
@@ -42,6 +46,7 @@ const replacePlugin = replace({
     values: {
         __SDK_API_URL__: JSON.stringify(SDK_API_URL),
         __SDK_APP_URL__: JSON.stringify(SDK_APP_URL),
+        __SDK_VERSION__: JSON.stringify(SDK_VERSION),
     },
 });
 
