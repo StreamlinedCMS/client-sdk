@@ -1476,6 +1476,49 @@ test("toolbar hides Sign Out and Admin buttons when mock auth is enabled", async
     expect(await adminLink.count()).toBe(0);
 });
 
+test("invalid API key is cleared on page load and shows sign-in link", async () => {
+    server.clearContent();
+
+    const expiredApiKey = "expired-test-key";
+
+    // Mark this API key as invalid (server will return 401)
+    server.setInvalidApiKey(expiredApiKey);
+
+    // Set up localStorage with the expired key before navigating
+    // We need to navigate first to set localStorage on the correct origin
+    const authTestUrl = `${testUrl}/auth-test.html`;
+    await page.goto(authTestUrl);
+
+    // Set the expired API key in localStorage using the SDK's storage format
+    await page.evaluate((key) => {
+        // scms_auth stores { key, appId }
+        localStorage.setItem("scms_auth", JSON.stringify({ key, appId: "test-app" }));
+        // scms_mode stores { mode, appId }
+        localStorage.setItem("scms_mode", JSON.stringify({ mode: "author", appId: "test-app" }));
+    }, expiredApiKey);
+
+    // Reload the page - SDK should validate the key and clear it
+    await page.reload();
+
+    // Wait for SDK to initialize - should show sign-in link, not toolbar
+    await page.waitForSelector("scms-sign-in-link");
+
+    // Toolbar should NOT be present
+    const toolbar = page.locator("scms-toolbar");
+    expect(await toolbar.count()).toBe(0);
+
+    // Sign-in link should be visible
+    const signInLink = page.locator("scms-sign-in-link");
+    expect(await signInLink.isVisible()).toBe(true);
+
+    // localStorage should have the auth key cleared
+    const storedAuth = await page.evaluate(() => localStorage.getItem("scms_auth"));
+    expect(storedAuth).toBeNull();
+
+    // Clean up
+    server.clearInvalidApiKeys();
+});
+
 test("drag and drop marks changes as unsaved", async () => {
     server.clearContent();
     server.setContent(

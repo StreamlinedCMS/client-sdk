@@ -23,6 +23,16 @@ import type {
 } from "../types.js";
 
 /**
+ * Error thrown when an API request fails due to authentication issues (401/403)
+ */
+class AuthError extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = "AuthError";
+    }
+}
+
+/**
  * Configuration for StreamlinedCMS
  */
 interface ViewerConfig {
@@ -232,7 +242,7 @@ class EditorController {
         }
 
         // Set up auth UI based on stored state
-        this.setupAuthUI();
+        await this.setupAuthUI();
 
         this.log.info("Lazy module initialized", {
             editableCount: this.editableElements.size,
@@ -470,10 +480,19 @@ class EditorController {
         this.log.debug("Scanned templates", { count: this.templates.size });
     }
 
-    private setupAuthUI(): void {
+    private async setupAuthUI(): Promise<void> {
         const storedKey = this.keyStorage.getStoredKey();
 
         if (storedKey) {
+            // Validate the stored key before trusting it
+            const isValid = await this.validateApiKey(storedKey);
+            if (!isValid) {
+                this.log.info("Stored API key is no longer valid, clearing");
+                this.keyStorage.clearStoredKey();
+                this.showSignInLink();
+                return;
+            }
+
             this.apiKey = storedKey;
 
             // Set up all custom triggers as sign-out
@@ -493,6 +512,31 @@ class EditorController {
         } else {
             this.showSignInLink();
             this.log.debug("No valid API key, showing sign-in link");
+        }
+    }
+
+    /**
+     * Validate an API key by making a request to the keys/@me endpoint
+     * Returns true if valid, false if invalid (401/403) or on network error
+     */
+    private async validateApiKey(apiKey: string): Promise<boolean> {
+        try {
+            const response = await fetch(
+                `${this.config.apiUrl}/apps/${this.config.appId}/keys/@me`,
+                {
+                    headers: { Authorization: `Bearer ${apiKey}` },
+                },
+            );
+
+            if (response.status === 401 || response.status === 403) {
+                return false;
+            }
+
+            return response.ok;
+        } catch (error) {
+            this.log.warn("Failed to validate API key", error);
+            // On network error, assume key is still valid to avoid logging user out
+            return true;
         }
     }
 
@@ -896,8 +940,8 @@ class EditorController {
         }
     }
 
-    private signOut(): void {
-        if (this.hasUnsavedChanges()) {
+    private signOut(skipConfirmation = false): void {
+        if (!skipConfirmation && this.hasUnsavedChanges()) {
             const confirmed = confirm("You have unsaved changes. Sign out anyway?");
             if (!confirmed) return;
         }
@@ -1512,6 +1556,9 @@ class EditorController {
                     });
 
                     if (!response.ok) {
+                        if (response.status === 401 || response.status === 403) {
+                            throw new AuthError(`${key}: ${response.status} ${response.statusText}`);
+                        }
                         throw new Error(`${key}: ${response.status} ${response.statusText}`);
                     }
 
@@ -1537,6 +1584,9 @@ class EditorController {
                 });
 
                 if (!response.ok && response.status !== 404) {
+                    if (response.status === 401 || response.status === 403) {
+                        throw new AuthError(`Delete ${key}: ${response.status} ${response.statusText}`);
+                    }
                     throw new Error(`Delete ${key}: ${response.status} ${response.statusText}`);
                 }
 
@@ -1565,6 +1615,11 @@ class EditorController {
                 });
 
                 if (!response.ok) {
+                    if (response.status === 401 || response.status === 403) {
+                        throw new AuthError(
+                            `Order ${templateId}: ${response.status} ${response.statusText}`,
+                        );
+                    }
                     throw new Error(
                         `Order ${templateId}: ${response.status} ${response.statusText}`,
                     );
@@ -1585,11 +1640,22 @@ class EditorController {
                 ...orderPromises,
             ]);
 
+            let hasAuthError = false;
             results.forEach((result) => {
                 if (result.status === "rejected") {
+                    if (result.reason instanceof AuthError) {
+                        hasAuthError = true;
+                    }
                     errors.push(result.reason?.message || "Unknown error");
                 }
             });
+
+            if (hasAuthError) {
+                this.log.error("Authentication failed during save", { errors });
+                alert("Your session has expired. Please sign in again to save your changes.");
+                this.signOut(true); // Skip "unsaved changes" confirmation
+                return;
+            }
 
             if (errors.length > 0) {
                 this.log.error("Some operations failed", { errors });

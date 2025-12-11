@@ -17,9 +17,45 @@ export class TestServer {
     private port: number | null = null;
     // In-memory storage for content during tests
     private contentStore: Map<string, ContentElement> = new Map();
+    // Set of API keys that should be rejected with 401
+    private invalidApiKeys: Set<string> = new Set();
 
     constructor(_preferredPort?: number) {
         // Preferred port is ignored - we always use getPort()
+    }
+
+    /**
+     * Mark an API key as invalid (will return 401 on authenticated requests)
+     */
+    setInvalidApiKey(apiKey: string): void {
+        this.invalidApiKeys.add(apiKey);
+    }
+
+    /**
+     * Clear all invalid API keys
+     */
+    clearInvalidApiKeys(): void {
+        this.invalidApiKeys.clear();
+    }
+
+    /**
+     * Check if a request has an invalid API key
+     * Returns true if the key is invalid and response was sent
+     */
+    private checkAuthAndReject(req: IncomingMessage, res: ServerResponse): boolean {
+        const authHeader = req.headers.authorization;
+        if (authHeader?.startsWith("Bearer ")) {
+            const apiKey = authHeader.slice(7);
+            if (this.invalidApiKeys.has(apiKey)) {
+                res.writeHead(401, {
+                    "Content-Type": "application/json",
+                    "Access-Control-Allow-Origin": "*",
+                });
+                res.end(JSON.stringify({ error: "Invalid API key" }));
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -52,17 +88,69 @@ export class TestServer {
         if (req.method === "OPTIONS") {
             res.writeHead(204, {
                 "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "GET, PUT, DELETE, OPTIONS",
+                "Access-Control-Allow-Methods": "GET, HEAD, PUT, DELETE, OPTIONS",
                 "Access-Control-Allow-Headers": "Content-Type, Authorization",
             });
             res.end();
             return true;
         }
 
-        // Match: /apps/{appId}/content (GET all content)
+        // Match: /apps/{appId}/keys/@me (GET) - API key validation endpoint
+        const keysMeMatch = pathname.match(/^\/apps\/([^/]+)\/keys\/@me$/);
+        if (keysMeMatch && req.method === "GET") {
+            // Check for invalid API key
+            if (this.checkAuthAndReject(req, res)) {
+                return true;
+            }
+
+            // Return mock key info for valid keys
+            const authHeader = req.headers.authorization;
+            const apiKey = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
+
+            if (!apiKey) {
+                res.writeHead(401, {
+                    "Content-Type": "application/json",
+                    "Access-Control-Allow-Origin": "*",
+                });
+                res.end(JSON.stringify({ error: "API key required" }));
+                return true;
+            }
+
+            // Return mock key info
+            res.writeHead(200, {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Origin": "*",
+            });
+            res.end(
+                JSON.stringify({
+                    id: "test-key-id",
+                    userId: "test-user-id",
+                    createdAt: new Date().toISOString(),
+                    lastUsedAt: new Date().toISOString(),
+                }),
+            );
+            return true;
+        }
+
+        // Match: /apps/{appId}/content (GET or HEAD)
         const contentListMatch = pathname.match(/^\/apps\/([^/]+)\/content$/);
-        if (contentListMatch && req.method === "GET") {
+        if (contentListMatch && (req.method === "GET" || req.method === "HEAD")) {
+            // Check for invalid API key (used for auth validation)
+            if (this.checkAuthAndReject(req, res)) {
+                return true;
+            }
+
             const appId = contentListMatch[1];
+
+            // HEAD request - just return 200 to validate auth
+            if (req.method === "HEAD") {
+                res.writeHead(200, {
+                    "Access-Control-Allow-Origin": "*",
+                });
+                res.end();
+                return true;
+            }
+
             // Build key-value response format: { elements: {...}, groups: {...} }
             const elements: Record<string, ContentElement> = {};
             const groups: Record<string, { elements: Record<string, ContentElement> }> = {};
@@ -226,6 +314,18 @@ export class TestServer {
                         );
                         let html = await readFile(htmlPath, "utf-8");
                         // Replace template placeholder with actual API URL
+                        html = html.replace("{{API_URL}}", `http://localhost:${this.port}/v1`);
+                        res.writeHead(200, { "Content-Type": "text/html" });
+                        res.end(html);
+                        return;
+                    }
+                    // Auth test page (no mock auth)
+                    else if (pathname === "/auth-test.html") {
+                        const htmlPath = join(
+                            process.cwd(),
+                            "tests/browser/fixtures/test-page-no-mock-auth.html",
+                        );
+                        let html = await readFile(htmlPath, "utf-8");
                         html = html.replace("{{API_URL}}", `http://localhost:${this.port}/v1`);
                         res.writeHead(200, { "Content-Type": "text/html" });
                         res.end(html);
