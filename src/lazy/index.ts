@@ -808,6 +808,7 @@ class EditorController {
         toolbar.activeElement = this.editingKey;
         toolbar.appUrl = this.config.appUrl;
         toolbar.appId = this.config.appId;
+        toolbar.mockAuth = this.config.mockAuth?.enabled ?? false;
 
         toolbar.addEventListener("mode-change", ((e: CustomEvent<{ mode: EditorMode }>) => {
             this.setMode(e.detail.mode);

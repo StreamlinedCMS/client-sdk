@@ -42,6 +42,9 @@ export class Toolbar extends LitElement {
     @property({ type: String, attribute: "app-id" })
     appId: string | null = null;
 
+    @property({ type: Boolean, attribute: "mock-auth" })
+    mockAuth = false;
+
     // Template context - set when editing an element inside a template
     @property({ type: String, attribute: "template-id" })
     templateId: string | null = null;
@@ -524,6 +527,7 @@ export class Toolbar extends LitElement {
     }
 
     private renderSignOutButton() {
+        if (this.mockAuth) return nothing;
         return html`
             <button
                 class="px-3 py-1.5 text-xs font-medium text-gray-400 hover:text-gray-600 transition-colors"
@@ -535,6 +539,7 @@ export class Toolbar extends LitElement {
     }
 
     private renderAdminLink() {
+        if (this.mockAuth) return nothing;
         if (!this.appUrl || !this.appId) return nothing;
         const adminUrl = `${this.appUrl}/apps/${encodeURIComponent(this.appId)}`;
         return html`
@@ -596,11 +601,13 @@ export class Toolbar extends LitElement {
                     <!-- Right: Save + Sign Out + Admin (separated) -->
                     <div class="flex items-center">
                         ${this.renderSaveButton()}
-                        <div class="ml-6 pl-6 border-l border-gray-200 flex items-center">
-                            ${this.renderSignOutButton()}
-                            <span class="mx-2 text-gray-300">|</span>
-                            ${this.renderAdminLink()}
-                        </div>
+                        ${this.mockAuth
+                            ? nothing
+                            : html`<div class="ml-6 pl-6 border-l border-gray-200 flex items-center">
+                                  ${this.renderSignOutButton()}
+                                  <span class="mx-2 text-gray-300">|</span>
+                                  ${this.renderAdminLink()}
+                              </div>`}
                     </div>
                 </div>
             </div>
@@ -881,6 +888,17 @@ export class Toolbar extends LitElement {
     }
 
     private renderMobileSettingsSection() {
+        // When mockAuth is enabled, only show the mode toggle centered
+        if (this.mockAuth) {
+            return html`
+                <div class="mobile-section">
+                    <div class="flex items-center justify-center">
+                        ${this.renderModeToggle()}
+                    </div>
+                </div>
+            `;
+        }
+
         return html`
             <div class="mobile-section">
                 <div class="flex items-center justify-between">

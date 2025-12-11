@@ -1458,6 +1458,24 @@ test("drag and drop reorders instances", async () => {
     expect(await teamMembers.nth(2).locator('[data-scms-text="name"]').textContent()).toBe("Bob");
 });
 
+test("toolbar hides Sign Out and Admin buttons when mock auth is enabled", async () => {
+    server.clearContent();
+
+    await page.goto(testUrl);
+    await page.waitForSelector("scms-toolbar");
+
+    // The test page uses data-mock-auth="true", so Sign Out and Admin should be hidden
+    const toolbar = page.locator("scms-toolbar");
+
+    // Sign Out button should not exist
+    const signOutButton = toolbar.locator("button:has-text('Sign Out')");
+    expect(await signOutButton.count()).toBe(0);
+
+    // Admin link should not exist
+    const adminLink = toolbar.locator("a:has-text('Admin')");
+    expect(await adminLink.count()).toBe(0);
+});
+
 test("drag and drop marks changes as unsaved", async () => {
     server.clearContent();
     server.setContent(
