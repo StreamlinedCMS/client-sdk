@@ -77,6 +77,7 @@ export default [
             typescript({
                 tsconfig: "./tsconfig.json",
                 declaration: false,
+                declarationMap: false,
             }),
         ],
     },
@@ -93,6 +94,7 @@ export default [
             typescript({
                 tsconfig: "./tsconfig.json",
                 declaration: false,
+                declarationMap: false,
             }),
             terserPlugin,
         ],
@@ -131,6 +133,7 @@ export default [
             typescript({
                 tsconfig: "./tsconfig.json",
                 declaration: false,
+                declarationMap: false,
             }),
             terserPlugin,
         ],

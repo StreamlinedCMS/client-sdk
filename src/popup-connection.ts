@@ -165,6 +165,5 @@ export class PopupConnection<TResult> {
         }
 
         this.popup = null;
-        this.resolvePromise = null;
     }
 }
