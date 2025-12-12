@@ -223,10 +223,6 @@ class EditorController {
             appId: this.config.appId,
         });
 
-        // Fetch saved content to know which elements have user-saved data
-        // (we don't normalize whitespace for those - only for initial DOM content)
-        await this.fetchSavedContentKeys();
-
         // Re-scan editable elements (viewer already populated them)
         this.scanEditableElements();
 
@@ -237,12 +233,21 @@ class EditorController {
         if (this.config.mockAuth?.enabled) {
             this.apiKey = "mock-api-key";
             this.log.debug("Mock authentication enabled");
+            // Fetch saved content keys for editing (whitespace normalization)
+            await this.fetchSavedContentKeys();
             this.setMode("author");
             return;
         }
 
         // Set up auth UI based on stored state
+        // This validates stored API key and sets this.apiKey if valid
         await this.setupAuthUI();
+
+        // Only fetch saved content keys if we have an authenticated editor
+        // (needed to know which elements have saved content for whitespace normalization)
+        if (this.apiKey) {
+            await this.fetchSavedContentKeys();
+        }
 
         this.log.info("Lazy module initialized", {
             editableCount: this.editableElements.size,
