@@ -193,6 +193,14 @@
         let instanceId: string | null = null;
         let foundGroupBeforeTemplate = false;
 
+        // Check the element itself for inline group attribute
+        const selfGroupId = element.getAttribute("data-scms-group");
+        if (selfGroupId) {
+            groupId = selfGroupId;
+            // Inline group always takes precedence (no template context possible on self)
+            foundGroupBeforeTemplate = true;
+        }
+
         let current = element.parentElement;
         while (current) {
             // Check for group

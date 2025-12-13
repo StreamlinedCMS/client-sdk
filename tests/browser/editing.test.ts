@@ -248,14 +248,14 @@ test("typed text content is parsed correctly", async () => {
 
 test("JSON without type field uses element's declared type", async () => {
     server.clearContent();
-    // Old link format: JSON with href/target/text but NO type field
+    // Link format: JSON with href/target/value but NO type field
     server.setContent(
         "test-app",
         "test-link",
         JSON.stringify({
             href: "https://old-format-link.com",
             target: "_blank",
-            text: "Old Format Link",
+            value: "Old Format Link",
         }),
     );
 
@@ -684,6 +684,23 @@ test("saving shared group element persists with correct key format", async () =>
             .locator('[data-scms-group="company"] [data-scms-text="name"]')
             .textContent(),
     ).toBe("Updated Company");
+});
+
+test("inline group attribute on same element scopes content correctly", async () => {
+    server.clearContent();
+    // Content stored with inline group key: groupId:elementId
+    server.setContent(
+        "test-app",
+        "company-name:name",
+        JSON.stringify({ type: "text", value: "Acme Corporation" }),
+    );
+
+    await page.goto(testUrl);
+    await page.waitForSelector(".streamlined-editable");
+
+    // Element has both data-scms-group="company-name" and data-scms-text="name" on same element
+    const inlineGroupElement = page.locator('[data-scms-group="company-name"][data-scms-text="name"]');
+    expect(await inlineGroupElement.textContent()).toBe("Acme Corporation");
 });
 
 // Template instance add/remove tests
