@@ -12,7 +12,7 @@ import { tailwindSheet } from "./styles.js";
 export interface LinkData {
     href: string;
     target: string;
-    text: string;
+    value: string;
 }
 
 @customElement("scms-link-editor-modal")
@@ -21,7 +21,7 @@ export class LinkEditorModal extends LitElement {
     elementId: string | null = null;
 
     @property({ type: Object })
-    linkData: LinkData = { href: "", target: "", text: "" };
+    linkData: LinkData = { href: "", target: "", value: "" };
 
     @state()
     private editedHref = "";
@@ -30,7 +30,7 @@ export class LinkEditorModal extends LitElement {
     private editedTarget = "";
 
     @state()
-    private editedText = "";
+    private editedValue = "";
 
     static styles = [
         tailwindSheet,
@@ -65,7 +65,8 @@ export class LinkEditorModal extends LitElement {
             }
 
             input,
-            select {
+            select,
+            textarea {
                 font-size: 14px;
             }
 
@@ -79,7 +80,7 @@ export class LinkEditorModal extends LitElement {
         super.connectedCallback();
         this.editedHref = this.linkData.href;
         this.editedTarget = this.linkData.target;
-        this.editedText = this.linkData.text;
+        this.editedValue = this.linkData.value;
         // Prevent body scroll while modal is open
         document.body.style.overflow = "hidden";
     }
@@ -93,7 +94,7 @@ export class LinkEditorModal extends LitElement {
         if (changedProperties.has("linkData")) {
             this.editedHref = this.linkData.href;
             this.editedTarget = this.linkData.target;
-            this.editedText = this.linkData.text;
+            this.editedValue = this.linkData.value;
         }
     }
 
@@ -107,9 +108,9 @@ export class LinkEditorModal extends LitElement {
         this.editedTarget = select.value;
     }
 
-    private handleTextInput(e: Event) {
-        const input = e.target as HTMLInputElement;
-        this.editedText = input.value;
+    private handleValueInput(e: Event) {
+        const textarea = e.target as HTMLTextAreaElement;
+        this.editedValue = textarea.value;
     }
 
     private handleApply() {
@@ -119,7 +120,7 @@ export class LinkEditorModal extends LitElement {
                     linkData: {
                         href: this.editedHref,
                         target: this.editedTarget,
-                        text: this.editedText,
+                        value: this.editedValue,
                     },
                 },
                 bubbles: true,
@@ -147,7 +148,7 @@ export class LinkEditorModal extends LitElement {
         return (
             this.editedHref !== this.linkData.href ||
             this.editedTarget !== this.linkData.target ||
-            this.editedText !== this.linkData.text
+            this.editedValue !== this.linkData.value
         );
     }
 
@@ -201,18 +202,18 @@ export class LinkEditorModal extends LitElement {
 
                 <!-- Form -->
                 <div class="p-4 space-y-4">
-                    <!-- Link Text -->
+                    <!-- Link Content -->
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">
-                            Link Text
+                            Link Content (HTML)
                         </label>
-                        <input
-                            type="text"
-                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400"
-                            .value=${this.editedText}
-                            @input=${this.handleTextInput}
+                        <textarea
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400 font-mono text-sm"
+                            rows="3"
+                            .value=${this.editedValue}
+                            @input=${this.handleValueInput}
                             placeholder="Click here"
-                        />
+                        ></textarea>
                     </div>
 
                     <!-- URL -->

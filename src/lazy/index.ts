@@ -1412,7 +1412,7 @@ class EditorController {
                 type: "link",
                 href: info.element.href,
                 target: info.element.target,
-                text: info.element.textContent || "",
+                value: info.element.innerHTML,
                 ...(attributes && Object.keys(attributes).length > 0 ? { attributes } : {}),
             };
             return JSON.stringify(data);
@@ -1462,15 +1462,15 @@ class EditorController {
                 const linkData = data as LinkContentData;
                 info.element.href = linkData.href;
                 info.element.target = linkData.target;
-                info.element.textContent = linkData.text;
+                info.element.innerHTML = linkData.value;
             } else if (!data.type) {
                 // No type field in JSON - use element's declared type
                 if (elementType === "link" && info.element instanceof HTMLAnchorElement) {
-                    const linkData = data as { href?: string; target?: string; text?: string };
+                    const linkData = data as { href?: string; target?: string; value?: string };
                     if (linkData.href !== undefined) {
                         info.element.href = linkData.href;
                         info.element.target = linkData.target || "";
-                        info.element.textContent = linkData.text || "";
+                        info.element.innerHTML = linkData.value || "";
                         return;
                     }
                 } else if (elementType === "image" && info.element instanceof HTMLImageElement) {
@@ -1925,7 +1925,7 @@ class EditorController {
         modal.linkData = {
             href: primaryAnchor.href,
             target: primaryAnchor.target,
-            text: primaryAnchor.textContent || "",
+            value: primaryAnchor.innerHTML,
         };
 
         // Prevent clicks inside modal from deselecting the element
@@ -1940,7 +1940,7 @@ class EditorController {
                 type: "link",
                 href: e.detail.linkData.href,
                 target: e.detail.linkData.target,
-                text: e.detail.linkData.text,
+                value: e.detail.linkData.value,
                 ...(attributes && Object.keys(attributes).length > 0 ? { attributes } : {}),
             };
             this.setContent(key, JSON.stringify(data));
@@ -2042,7 +2042,7 @@ class EditorController {
         } else if (type === "html") {
             element.innerHTML = this.normalizeHtmlWhitespace(element.innerHTML);
         } else if (type === "link" && element instanceof HTMLAnchorElement) {
-            element.textContent = this.normalizeWhitespace(element.textContent || "");
+            element.innerHTML = this.normalizeHtmlWhitespace(element.innerHTML);
         }
         // image type doesn't need whitespace normalization
     }

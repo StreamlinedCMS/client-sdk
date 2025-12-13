@@ -509,11 +509,11 @@
                     type: "link";
                     href: string;
                     target: string;
-                    text: string;
+                    value: string;
                 };
                 element.href = linkData.href;
                 element.target = linkData.target;
-                element.textContent = linkData.text;
+                element.innerHTML = linkData.value;
                 return element;
             } else if (data.type) {
                 // Unknown type with type field - don't process
@@ -522,11 +522,11 @@
 
             // No type field in JSON - use element's declared type
             if (type === "link" && element instanceof HTMLAnchorElement) {
-                const linkData = data as { href?: string; target?: string; text?: string };
+                const linkData = data as { href?: string; target?: string; value?: string };
                 if (linkData.href !== undefined) {
                     element.href = linkData.href;
                     element.target = linkData.target || "";
-                    element.textContent = linkData.text || "";
+                    element.innerHTML = linkData.value || "";
                 }
             } else if (type === "image" && element instanceof HTMLImageElement) {
                 const imageData = data as { src?: string };

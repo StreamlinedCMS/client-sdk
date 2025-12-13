@@ -126,7 +126,7 @@ export interface LinkContentData extends BaseContentData {
     type: "link";
     href: string;
     target: string;
-    text: string;
+    value: string;
 }
 
 export type ContentData = TextContentData | HtmlContentData | ImageContentData | LinkContentData;

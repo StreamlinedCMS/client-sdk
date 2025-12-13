@@ -182,7 +182,7 @@ test("typed link content is parsed correctly (not shown as raw JSON)", async () 
             type: "link",
             href: "https://parsed-link.com",
             target: "_blank",
-            text: "Parsed Link Text",
+            value: "Parsed Link Text",
         }),
     );
 
