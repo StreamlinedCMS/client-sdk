@@ -134,6 +134,7 @@ class EditorController {
     private popupManager: PopupManager;
     private apiKey: string | null = null;
     private currentMode: EditorMode = "viewer";
+    private editingEnabled = false;
     // Map key is composite: groupId:elementId for grouped, just elementId for ungrouped
     // Multiple elements can share the same key (groups inside templates)
     private editableElements: Map<string, EditableElementInfo[]> = new Map();
@@ -167,6 +168,8 @@ class EditorController {
     private sortableInstances: Map<string, Sortable> = new Map();
     // Keys that have saved content from API (used to skip whitespace normalization)
     private savedContentKeys: Set<string> = new Set();
+    // Track if domain warning has been shown (only show once)
+    private domainWarningShown = false;
 
     constructor(config: ViewerConfig) {
         this.config = config;
@@ -184,17 +187,59 @@ class EditorController {
     }
 
     /**
+     * Wrapper for fetch that handles common API error cases.
+     * Shows warning on 402/403, clears it on success.
+     */
+    private async apiFetch(url: string, options?: RequestInit): Promise<Response> {
+        const response = await fetch(url, options);
+
+        // Show warning on 402 (payment required - upgrade needed for custom domain)
+        if (response.status === 402 && !this.domainWarningShown) {
+            if (this.toolbar) {
+                const domain = window.location.hostname;
+                this.toolbar.warning = `A paid plan is required to edit on live domains like "${domain}". See Admin → Billing.`;
+            }
+            this.domainWarningShown = true;
+        }
+
+        // Show warning on 403 (domain not whitelisted)
+        if (response.status === 403 && !this.domainWarningShown) {
+            if (this.toolbar) {
+                const domain = window.location.hostname;
+                this.toolbar.warning = `Domain "${domain}" is not whitelisted. Add it in Admin → Settings.`;
+            }
+            this.domainWarningShown = true;
+        }
+
+        // Clear warning on successful request (user may have fixed the issue in another tab)
+        if (response.ok && this.domainWarningShown) {
+            if (this.toolbar) {
+                this.toolbar.warning = null;
+            }
+            this.domainWarningShown = false;
+        }
+
+        return response;
+    }
+
+    /**
      * Fetch content from API to determine which elements have saved content.
      * Elements with saved content should not have their whitespace normalized.
+     * Returns true on success, false if access denied (402/403).
      */
-    private async fetchSavedContentKeys(): Promise<void> {
+    private async fetchSavedContentKeys(): Promise<boolean> {
         try {
             const url = `${this.config.apiUrl}/apps/${this.config.appId}/content`;
-            const response = await fetch(url);
+            const response = await this.apiFetch(url);
+
+            if (response.status === 402 || response.status === 403) {
+                // Access denied - apiFetch already showed warning
+                return false;
+            }
 
             if (!response.ok) {
-                // No content or error - all elements will be normalized
-                return;
+                // Other error (404, 500, etc.) - all elements will be normalized
+                return true;
             }
 
             const data = (await response.json()) as ContentResponse;
@@ -213,8 +258,10 @@ class EditorController {
             }
 
             this.log.debug("Fetched saved content keys", { count: this.savedContentKeys.size });
+            return true;
         } catch (error) {
             this.log.warn("Could not fetch saved content keys", error);
+            return true; // Network error - assume ok to avoid blocking editing
         }
     }
 
@@ -233,21 +280,17 @@ class EditorController {
         if (this.config.mockAuth?.enabled) {
             this.apiKey = "mock-api-key";
             this.log.debug("Mock authentication enabled");
-            // Fetch saved content keys for editing (whitespace normalization)
-            await this.fetchSavedContentKeys();
             this.setMode("author");
+            const success = await this.fetchSavedContentKeys();
+            if (!success) {
+                this.disableEditing();
+            }
             return;
         }
 
         // Set up auth UI based on stored state
         // This validates stored API key and sets this.apiKey if valid
         await this.setupAuthUI();
-
-        // Only fetch saved content keys if we have an authenticated editor
-        // (needed to know which elements have saved content for whitespace normalization)
-        if (this.apiKey) {
-            await this.fetchSavedContentKeys();
-        }
 
         this.log.info("Lazy module initialized", {
             editableCount: this.editableElements.size,
@@ -509,7 +552,14 @@ class EditorController {
             });
 
             const storedMode = this.keyStorage.getStoredMode();
-            this.setMode(storedMode === "author" ? "author" : "viewer");
+            const mode = storedMode === "author" ? "author" : "viewer";
+            this.setMode(mode);
+            if (mode === "author") {
+                const success = await this.fetchSavedContentKeys();
+                if (!success) {
+                    this.disableEditing();
+                }
+            }
             this.log.debug("Restored auth state", {
                 mode: this.currentMode,
                 triggerCount: customTriggers.length,
@@ -633,6 +683,11 @@ class EditorController {
             });
 
             this.setMode("author");
+            const success = await this.fetchSavedContentKeys();
+            if (!success) {
+                this.disableEditing();
+            }
+
             this.log.info("User authenticated via popup, entering author mode");
         } else {
             this.log.debug("Login popup closed without authentication");
@@ -644,19 +699,21 @@ class EditorController {
         this.keyStorage.storeMode(mode);
 
         if (mode === "author") {
-            this.enableAuthorMode();
+            this.log.debug("Entering author mode");
+            this.enableEditing();
         } else {
-            this.enableViewerMode();
+            this.log.debug("Entering viewer mode");
+            this.disableEditing();
         }
 
-        // Update toolbar mode
-        if (this.toolbar) {
-            this.toolbar.mode = mode;
-        }
+        this.showToolbar();
     }
 
-    private enableAuthorMode(): void {
-        this.log.debug("Entering author mode");
+    /**
+     * Enable editing on elements - adds classes, handlers, template controls
+     */
+    private enableEditing(): void {
+        this.editingEnabled = true;
 
         this.editableElements.forEach((infos, key) => {
             const elementType = this.getEditableType(key);
@@ -666,7 +723,7 @@ class EditorController {
 
                 if (!info.element.dataset.scmsClickHandler) {
                     info.element.addEventListener("click", (e) => {
-                        if (this.currentMode === "author") {
+                        if (this.editingEnabled) {
                             e.preventDefault();
                             e.stopPropagation();
 
@@ -697,7 +754,7 @@ class EditorController {
                 // Add double-click handler for images to open media manager (desktop)
                 if (elementType === "image" && !info.element.dataset.scmsDblClickHandler) {
                     info.element.addEventListener("dblclick", (e) => {
-                        if (this.currentMode === "author") {
+                        if (this.editingEnabled) {
                             e.preventDefault();
                             e.stopPropagation();
                             this.handleChangeImage();
@@ -709,7 +766,7 @@ class EditorController {
                 // Add double-click handler for links to navigate (desktop)
                 if (elementType === "link" && !info.element.dataset.scmsDblClickHandler) {
                     info.element.addEventListener("dblclick", (e) => {
-                        if (this.currentMode === "author") {
+                        if (this.editingEnabled) {
                             e.preventDefault();
                             e.stopPropagation();
                             this.handleGoToLink();
@@ -728,11 +785,13 @@ class EditorController {
 
         this.injectEditStyles();
         this.showTemplateControls();
-        this.showToolbar();
     }
 
-    private enableViewerMode(): void {
-        this.log.debug("Entering viewer mode");
+    /**
+     * Disable editing on elements - removes classes, contenteditable, template controls
+     */
+    private disableEditing(): void {
+        this.editingEnabled = false;
 
         this.editableElements.forEach((infos) => {
             for (const info of infos) {
@@ -753,7 +812,6 @@ class EditorController {
 
         this.hideTemplateControls();
         this.stopEditing();
-        this.showToolbar();
     }
 
     /**
@@ -957,23 +1015,7 @@ class EditorController {
         this.apiKey = null;
         this.currentMode = "viewer";
 
-        this.editableElements.forEach((infos) => {
-            for (const info of infos) {
-                info.element.classList.remove(
-                    "streamlined-editable",
-                    "streamlined-editing",
-                    "streamlined-editing-sibling",
-                );
-                info.element.removeAttribute("contenteditable");
-            }
-        });
-
-        // Remove event listeners (same as enableViewerMode)
-        document.removeEventListener("click", this.handleDocumentClick);
-        window.removeEventListener("beforeunload", this.handleBeforeUnload);
-
-        this.hideTemplateControls();
-        this.stopEditing();
+        this.disableEditing();
 
         // Convert all custom triggers back to sign-in
         this.customSignInTriggers.forEach((originalText, trigger) => {
@@ -1554,7 +1596,7 @@ class EditorController {
                     const url = info.groupId
                         ? `${this.config.apiUrl}/apps/${this.config.appId}/content/groups/${info.groupId}/elements/${storageElementId}`
                         : `${this.config.apiUrl}/apps/${this.config.appId}/content/elements/${storageElementId}`;
-                    const response = await fetch(url, {
+                    const response = await this.apiFetch(url, {
                         method: "PUT",
                         headers,
                         body: JSON.stringify({ content }),
@@ -1583,7 +1625,7 @@ class EditorController {
                     ? `${this.config.apiUrl}/apps/${this.config.appId}/content/groups/${groupId}/elements/${elementId}`
                     : `${this.config.apiUrl}/apps/${this.config.appId}/content/elements/${elementId}`;
 
-                const response = await fetch(url, {
+                const response = await this.apiFetch(url, {
                     method: "DELETE",
                     headers: { Authorization: headers["Authorization"] },
                 });
@@ -1613,7 +1655,7 @@ class EditorController {
                     ? `${this.config.apiUrl}/apps/${this.config.appId}/content/groups/${templateInfo.groupId}/elements/${orderKey}`
                     : `${this.config.apiUrl}/apps/${this.config.appId}/content/elements/${orderKey}`;
 
-                const response = await fetch(url, {
+                const response = await this.apiFetch(url, {
                     method: "PUT",
                     headers,
                     body: JSON.stringify({ content }),
@@ -1671,6 +1713,9 @@ class EditorController {
                     deleted: deleted.length,
                 });
                 this.stopEditing();
+
+                // Refresh saved content keys after successful save
+                await this.fetchSavedContentKeys();
             }
 
             this.updateToolbarHasChanges();

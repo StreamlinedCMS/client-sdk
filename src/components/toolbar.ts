@@ -45,6 +45,9 @@ export class Toolbar extends LitElement {
     @property({ type: Boolean, attribute: "mock-auth" })
     mockAuth = false;
 
+    @property({ type: String })
+    warning: string | null = null;
+
     // Template context - set when editing an element inside a template
     @property({ type: String, attribute: "template-id" })
     templateId: string | null = null;
@@ -331,6 +334,10 @@ export class Toolbar extends LitElement {
     }
 
     private renderModeToggle() {
+        // Hide toggle when there's a warning (domain not whitelisted, payment required)
+        if (this.warning) {
+            return null;
+        }
         return html`
             <scms-mode-toggle
                 .mode=${this.mode}
@@ -1028,7 +1035,24 @@ export class Toolbar extends LitElement {
     }
 
     render() {
-        return this.isMobile ? this.renderMobile() : this.renderDesktop();
+        return html`
+            ${this.warning ? this.renderWarning() : nothing}
+            ${this.isMobile ? this.renderMobile() : this.renderDesktop()}
+        `;
+    }
+
+    private renderWarning() {
+        return html`
+            <div class="bg-amber-500 text-black px-4 py-2 text-center text-sm flex items-center justify-center gap-3">
+                <span>${this.warning}</span>
+                <button
+                    class="px-2 py-1 bg-amber-600 hover:bg-amber-700 rounded text-white text-xs font-medium"
+                    @click=${() => window.location.reload()}
+                >
+                    Reload
+                </button>
+            </div>
+        `;
     }
 
     /**
