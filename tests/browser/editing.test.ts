@@ -488,6 +488,92 @@ test("editing template instance element saves with correct key", async () => {
     );
 });
 
+// Multi-instance template tests (all children recognized as instances)
+
+test("all template children are recognized as instances when no API data", async () => {
+    server.clearContent();
+
+    await page.goto(testUrl);
+    await page.waitForSelector("scms-toolbar");
+
+    // The features template has 3 children in the HTML
+    const featuresContainer = page.locator('[data-scms-template="features"]');
+    const featureItems = featuresContainer.locator(".feature-item");
+
+    // All 3 children should be recognized as instances
+    expect(await featureItems.count()).toBe(3);
+
+    // Each should have an instance ID assigned
+    for (let i = 0; i < 3; i++) {
+        const instanceId = await featureItems.nth(i).getAttribute("data-scms-instance");
+        expect(instanceId).toMatch(/^[a-z0-9]{5}$/);
+    }
+
+    // Original content should be preserved
+    expect(await featureItems.nth(0).locator('[data-scms-text="feature"]').textContent()).toBe(
+        "Feature One",
+    );
+    expect(await featureItems.nth(1).locator('[data-scms-text="feature"]').textContent()).toBe(
+        "Feature Two",
+    );
+    expect(await featureItems.nth(2).locator('[data-scms-text="feature"]').textContent()).toBe(
+        "Feature Three",
+    );
+});
+
+test("template structure mismatch is detected and marked", async () => {
+    server.clearContent();
+
+    await page.goto(testUrl);
+    await page.waitForSelector("scms-toolbar");
+
+    // The mismatched template has children with different structures
+    const mismatchedContainer = page.locator('[data-scms-template="mismatched"]');
+    const items = mismatchedContainer.locator(".item");
+
+    // Both items should exist
+    expect(await items.count()).toBe(2);
+
+    // First item should NOT have mismatch marker (it's the template definition)
+    expect(await items.nth(0).getAttribute("data-scms-structure-mismatch")).toBeNull();
+
+    // Second item SHOULD have mismatch marker (different structure)
+    expect(await items.nth(1).getAttribute("data-scms-structure-mismatch")).toBe("true");
+});
+
+test("API data replaces DOM children with cloned instances", async () => {
+    // Set up API data with 2 instances (different from the 3 in HTML)
+    server.clearContent();
+    server.setContent(
+        "test-app",
+        "features.inst1.feature",
+        JSON.stringify({ type: "text", value: "API Feature A" }),
+    );
+    server.setContent(
+        "test-app",
+        "features.inst2.feature",
+        JSON.stringify({ type: "text", value: "API Feature B" }),
+    );
+    server.setContent("test-app", "features._order", JSON.stringify(["inst1", "inst2"]));
+
+    await page.goto(testUrl);
+    await page.waitForSelector("scms-toolbar");
+
+    const featuresContainer = page.locator('[data-scms-template="features"]');
+    const featureItems = featuresContainer.locator(".feature-item");
+
+    // Should have 2 instances (from API), not 3 (from HTML)
+    expect(await featureItems.count()).toBe(2);
+
+    // Content should be from API
+    expect(await featureItems.nth(0).locator('[data-scms-text="feature"]').textContent()).toBe(
+        "API Feature A",
+    );
+    expect(await featureItems.nth(1).locator('[data-scms-text="feature"]').textContent()).toBe(
+        "API Feature B",
+    );
+});
+
 // Group inside template tests (shared content across instances)
 
 test("group inside template shares content across all instances", async () => {
@@ -750,9 +836,9 @@ test("clicking add button creates new template instance", async () => {
     const instanceId = await teamMembers.nth(1).getAttribute("data-scms-instance");
     expect(instanceId).toMatch(/^[a-z0-9]{5}$/);
 
-    // New instance should have default content
+    // New instance should have empty content (clean template)
     const newName = teamMembers.nth(1).locator('[data-scms-text="name"]');
-    expect(await newName.textContent()).toBe("Default Name");
+    expect(await newName.textContent()).toBe("");
 });
 
 test("new instance elements are editable", async () => {

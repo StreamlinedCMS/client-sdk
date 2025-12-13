@@ -730,6 +730,11 @@
                         first child a repeatable template. Authors can add and remove instances.
                     </p>
                     <p>
+                        All children in the container are recognized as instances. The first child
+                        defines the template structure. If other children have different structures,
+                        they'll show an orange warning indicator in edit mode.
+                    </p>
+                    <p>
                         Perfect for team members, testimonials, product cards, FAQ items, and more.
                     </p>
                 </div>
@@ -737,8 +742,8 @@
                 <div class="content-section">
                     <h2 data-scms-text="team-heading">Our Team</h2>
                     <p data-scms-text="team-intro">
-                        Meet the people behind the product. In author mode, hover over a team member
-                        to see the delete button, or use the "Add item" button to add more.
+                        Meet the people behind the product. The third team member has a "bio" field
+                        that doesn't exist in the template - notice the orange warning indicator.
                     </p>
 
                     <div class="team-grid" data-scms-template="team-member">
@@ -750,6 +755,26 @@
                             />
                             <h4 data-scms-text="name">Alex Johnson</h4>
                             <p class="role" data-scms-text="role">Founder & CEO</p>
+                        </div>
+                        <div class="team-member">
+                            <img
+                                data-scms-image="photo"
+                                src="https://placehold.co/120x120/10b981/white?text=SK"
+                                alt="Team member photo"
+                            />
+                            <h4 data-scms-text="name">Sarah Kim</h4>
+                            <p class="role" data-scms-text="role">Lead Designer</p>
+                        </div>
+                        <!-- This instance has mismatched structure (extra bio field) -->
+                        <div class="team-member">
+                            <img
+                                data-scms-image="photo"
+                                src="https://placehold.co/120x120/f59e0b/white?text=MR"
+                                alt="Team member photo"
+                            />
+                            <h4 data-scms-text="name">Mike Rodriguez</h4>
+                            <p class="role" data-scms-text="role">Senior Developer</p>
+                            <p class="bio" data-scms-text="bio">Full-stack engineer with 10 years experience.</p>
                         </div>
                     </div>
                 </div>

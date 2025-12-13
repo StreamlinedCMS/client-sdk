@@ -86,5 +86,24 @@
                 </div>
             </div>
         </div>
+
+        <!-- Multi-instance template (all children should be recognized) -->
+        <div class="test-section">
+            <h2>Features (Multi-Instance Test)</h2>
+            <ul data-scms-template="features" class="features-list">
+                <li class="feature-item"><span data-scms-text="feature">Feature One</span></li>
+                <li class="feature-item"><span data-scms-text="feature">Feature Two</span></li>
+                <li class="feature-item"><span data-scms-text="feature">Feature Three</span></li>
+            </ul>
+        </div>
+
+        <!-- Structure mismatch template (children have different structure) -->
+        <div class="test-section">
+            <h2>Mismatched Template Test</h2>
+            <div data-scms-template="mismatched" class="mismatched-container">
+                <div class="item"><span data-scms-text="title">Title One</span></div>
+                <div class="item"><span data-scms-text="title">Title Two</span><span data-scms-text="extra">Extra Field</span></div>
+            </div>
+        </div>
     </body>
 </html>

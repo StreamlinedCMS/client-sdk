@@ -61,6 +61,9 @@ export class Toolbar extends LitElement {
     @property({ type: Number, attribute: "instance-count" })
     instanceCount: number | null = null;
 
+    @property({ type: Boolean, attribute: "structure-mismatch" })
+    structureMismatch = false;
+
     @state()
     private expanded = false;
 
@@ -451,6 +454,24 @@ export class Toolbar extends LitElement {
         `;
     }
 
+    private renderStructureMismatchWarning() {
+        if (!this.structureMismatch) return nothing;
+
+        return html`
+            <div class="flex items-center gap-1.5 px-2 py-1 bg-orange-100 text-orange-700 rounded text-xs">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                    />
+                </svg>
+                <span>Structure differs from first item template</span>
+            </div>
+        `;
+    }
+
     private renderTemplateControls() {
         if (!this.templateId) return nothing;
 
@@ -467,6 +488,7 @@ export class Toolbar extends LitElement {
             "px-2 py-1.5 text-xs font-medium text-gray-300 border border-gray-200 rounded-md cursor-not-allowed";
 
         return html`
+            ${this.renderStructureMismatchWarning()}
             <div class="flex items-center gap-1 ml-2 pl-2 border-l border-gray-200">
                 <button
                     class=${canMoveUp ? enabledClass : disabledClass}
@@ -801,6 +823,7 @@ export class Toolbar extends LitElement {
                     ? nothing
                     : html`
                           <div class="flex flex-col gap-2">
+                              ${this.renderStructureMismatchWarning()}
                               <!-- Reorder buttons -->
                               <div class="flex gap-2">
                                   <button

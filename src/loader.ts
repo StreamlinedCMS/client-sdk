@@ -129,13 +129,46 @@
     }
 
     /**
-     * Generate a stable instance ID (5 alphanumeric characters)
+     * Strip content from template HTML for cloning new instances.
+     * - Removes text content
+     * - Strips instance IDs
+     * - For editable elements: keeps only reserved attributes (id, class, data-scms-*)
      */
-    function generateInstanceId(): string {
-        const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
-        const array = new Uint8Array(5);
-        crypto.getRandomValues(array);
-        return Array.from(array, (byte) => chars[byte % chars.length]).join("");
+    function stripTemplateContent(html: string): string {
+        const div = document.createElement("div");
+        div.innerHTML = html;
+
+        // Strip instance IDs (they vary between instances)
+        div.querySelectorAll("[data-scms-instance]").forEach((el) =>
+            el.removeAttribute("data-scms-instance"),
+        );
+
+        // For editable elements, strip all attributes except reserved ones
+        // This handles src, href, alt, title, and any custom attributes set via modals
+        const editableSelector =
+            "[data-scms-text], [data-scms-html], [data-scms-image], [data-scms-link]";
+        div.querySelectorAll(editableSelector).forEach((el) => {
+            const attributesToRemove: string[] = [];
+            for (let i = 0; i < el.attributes.length; i++) {
+                const attr = el.attributes[i];
+                // Keep: id, class, and data-scms-* attributes (element ID defines structure)
+                if (attr.name === "id" || attr.name === "class" || attr.name.startsWith("data-scms-")) {
+                    continue;
+                }
+                attributesToRemove.push(attr.name);
+            }
+            attributesToRemove.forEach((name) => el.removeAttribute(name));
+        });
+
+        // Replace all text nodes with empty strings
+        const walker = document.createTreeWalker(div, NodeFilter.SHOW_TEXT);
+        const textNodes: Text[] = [];
+        while (walker.nextNode()) {
+            textNodes.push(walker.currentNode as Text);
+        }
+        textNodes.forEach((node) => (node.textContent = ""));
+
+        return div.innerHTML;
     }
 
     /**
@@ -297,8 +330,9 @@
                 return;
             }
 
-            // Store original HTML before content population (for adding new instances later)
-            container.setAttribute("data-scms-template-html", templateElement.outerHTML);
+            // Store clean template HTML (content stripped) for cloning new instances
+            const cleanHtml = stripTemplateContent(templateElement.outerHTML);
+            container.setAttribute("data-scms-template-html", cleanHtml);
 
             templates.set(templateId, {
                 templateId,
@@ -442,8 +476,9 @@
     }
 
     /**
-     * Clone template instances based on content data
-     * Creates DOM nodes for each instance ID in the order array
+     * Clone template instances based on content data.
+     * Only processes templates that have API data - leaves DOM as-is otherwise.
+     * The lazy module handles initialization of templates without API data.
      */
     function cloneTemplateInstances(
         templates: Map<string, TemplateInfo>,
@@ -455,28 +490,35 @@
             // Check if this template is inside a group
             const groupId = getGroupId(container);
 
-            // Get ordered list of instance IDs
+            // Get ordered list of instance IDs from API
             const instanceIds = getTemplateInstanceIds(data, templateId, groupId ?? undefined);
 
+            // No API data - leave DOM as-is, lazy module will handle initialization
             if (instanceIds.length === 0) {
-                // No stored instances - generate an ID for the default instance
-                const defaultId = generateInstanceId();
-                templateElement.setAttribute("data-scms-instance", defaultId);
-                templateInfo.instanceCount = 1;
                 return;
             }
 
-            // Mark the original template element with the first instance ID
-            templateElement.setAttribute("data-scms-instance", instanceIds[0]);
+            // Get clean template HTML for cloning
+            const cleanTemplateHtml = container.getAttribute("data-scms-template-html");
 
-            // Clone for additional instances
-            for (let i = 1; i < instanceIds.length; i++) {
-                const clone = templateElement.cloneNode(true) as HTMLElement;
+            // Get all existing children
+            const existingChildren = Array.from(container.children).filter(
+                (child) => child instanceof HTMLElement,
+            ) as HTMLElement[];
+
+            // API has instance data - clone from clean template
+            // First, remove all existing children
+            existingChildren.forEach((child) => child.remove());
+
+            // Clone from clean template for each API instance ID
+            for (let i = 0; i < instanceIds.length; i++) {
+                const tempDiv = document.createElement("div");
+                tempDiv.innerHTML = cleanTemplateHtml || templateElement.outerHTML;
+                const clone = tempDiv.firstElementChild as HTMLElement;
+                if (!clone) continue;
+
                 clone.setAttribute("data-scms-instance", instanceIds[i]);
-
-                // Remove data-scms-template from clone (it's not a template container)
                 clone.removeAttribute("data-scms-template");
-
                 container.appendChild(clone);
             }
 

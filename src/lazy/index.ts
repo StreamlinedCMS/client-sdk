@@ -271,11 +271,11 @@ class EditorController {
             appId: this.config.appId,
         });
 
-        // Re-scan editable elements (viewer already populated them)
-        this.scanEditableElements();
-
-        // Scan for templates (for instance management)
+        // Scan for templates first (assigns instance IDs when no API data)
         this.scanTemplates();
+
+        // Then scan editable elements (needs instance IDs to build correct keys)
+        this.scanEditableElements();
 
         // Check for mock auth
         if (this.config.mockAuth?.enabled) {
@@ -481,7 +481,60 @@ class EditorController {
     }
 
     /**
-     * Scan for template containers in the DOM
+     * Strip content from template HTML for structure comparison.
+     * - Removes text content
+     * - Strips instance IDs
+     * - For editable elements: keeps only reserved attributes (id, class, data-scms-*)
+     */
+    private stripTemplateContent(html: string): string {
+        const div = document.createElement("div");
+        div.innerHTML = html;
+
+        // Strip instance IDs (they vary between instances)
+        div.querySelectorAll("[data-scms-instance]").forEach((el) =>
+            el.removeAttribute("data-scms-instance"),
+        );
+
+        // For editable elements, strip all attributes except reserved ones
+        // This handles src, href, alt, title, and any custom attributes set via modals
+        const editableSelector =
+            "[data-scms-text], [data-scms-html], [data-scms-image], [data-scms-link]";
+        div.querySelectorAll(editableSelector).forEach((el) => {
+            const attributesToRemove: string[] = [];
+            for (let i = 0; i < el.attributes.length; i++) {
+                const attr = el.attributes[i];
+                // Keep: id, class, and data-scms-* attributes (element ID defines structure)
+                if (attr.name === "id" || attr.name === "class" || attr.name.startsWith("data-scms-")) {
+                    continue;
+                }
+                attributesToRemove.push(attr.name);
+            }
+            attributesToRemove.forEach((name) => el.removeAttribute(name));
+        });
+
+        // Replace all text nodes with empty strings
+        const walker = document.createTreeWalker(div, NodeFilter.SHOW_TEXT);
+        const textNodes: Text[] = [];
+        while (walker.nextNode()) {
+            textNodes.push(walker.currentNode as Text);
+        }
+        textNodes.forEach((node) => (node.textContent = ""));
+
+        return div.innerHTML;
+    }
+
+    /**
+     * Normalize template HTML for structure comparison.
+     * Strips content and normalizes whitespace for reliable comparison.
+     */
+    private normalizeForComparison(html: string): string {
+        return this.stripTemplateContent(html).replace(/\s+/g, " ").trim();
+    }
+
+    /**
+     * Scan for template containers in the DOM.
+     * Initializes uninitialized children (no API data case) by assigning IDs
+     * and validating structure.
      */
     private scanTemplates(): void {
         this.templates.clear();
@@ -493,20 +546,57 @@ class EditorController {
             const templateElement = container.firstElementChild as HTMLElement | null;
             if (!templateElement) return;
 
-            // Collect instance IDs from DOM (in order)
-            const instances = container.querySelectorAll<HTMLElement>("[data-scms-instance]");
-            const instanceIds: string[] = [];
-            instances.forEach((instance) => {
-                const id = instance.getAttribute("data-scms-instance");
-                if (id) instanceIds.push(id);
-            });
-
             // Check if template is inside a group
             const groupId = this.getGroupIdFromElement(container);
 
             // Get original HTML from loader (stored before content population)
             const templateHtml =
                 container.getAttribute("data-scms-template-html") || templateElement.outerHTML;
+
+            // Get all direct children (potential instances)
+            const allChildren = Array.from(container.children).filter(
+                (child): child is HTMLElement => child instanceof HTMLElement,
+            );
+
+            // Check if children need initialization (no instance IDs = no API data)
+            const hasInstanceIds = allChildren.some((child) =>
+                child.hasAttribute("data-scms-instance"),
+            );
+
+            const instanceIds: string[] = [];
+
+            if (!hasInstanceIds && allChildren.length > 0) {
+                // No API data - initialize all children as instances
+                const normalizedTemplate = this.normalizeForComparison(templateHtml);
+
+                allChildren.forEach((child, index) => {
+                    const instanceId = this.generateInstanceId();
+                    child.setAttribute("data-scms-instance", instanceId);
+                    instanceIds.push(instanceId);
+
+                    // Validate structure (skip first child, it's the template definition)
+                    if (index > 0) {
+                        const normalizedChild = this.normalizeForComparison(child.outerHTML);
+                        if (normalizedChild !== normalizedTemplate) {
+                            child.setAttribute("data-scms-structure-mismatch", "true");
+                            this.log.warn(
+                                `Template "${templateId}" instance ${index + 1} has different structure than template definition`,
+                            );
+                        }
+                    }
+                });
+
+                this.log.debug("Initialized template children", {
+                    templateId,
+                    instanceCount: allChildren.length,
+                });
+            } else {
+                // Collect existing instance IDs from DOM (in order)
+                allChildren.forEach((child) => {
+                    const id = child.getAttribute("data-scms-instance");
+                    if (id) instanceIds.push(id);
+                });
+            }
 
             this.templates.set(templateId, {
                 templateId,
@@ -1138,6 +1228,30 @@ class EditorController {
 
             [data-scms-instance]:hover > .scms-instance-delete {
                 opacity: 1;
+            }
+
+            /* Template structure mismatch indicator */
+            [data-scms-structure-mismatch] {
+                outline: 2px dashed #f97316 !important;
+                outline-offset: -2px;
+                position: relative;
+            }
+
+            [data-scms-structure-mismatch]::after {
+                content: "⚠";
+                position: absolute;
+                bottom: 4px;
+                left: 4px;
+                width: 20px;
+                height: 20px;
+                background: #f97316;
+                color: white;
+                border-radius: 50%;
+                font-size: 12px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 10;
             }
 
             /* Template add button */
@@ -2940,6 +3054,7 @@ class EditorController {
             this.toolbar.instanceId = null;
             this.toolbar.instanceIndex = null;
             this.toolbar.instanceCount = null;
+            this.toolbar.structureMismatch = false;
             return;
         }
 
@@ -2949,6 +3064,7 @@ class EditorController {
             this.toolbar.instanceId = null;
             this.toolbar.instanceIndex = null;
             this.toolbar.instanceCount = null;
+            this.toolbar.structureMismatch = false;
             return;
         }
 
@@ -2960,6 +3076,7 @@ class EditorController {
             this.toolbar.instanceId = null;
             this.toolbar.instanceIndex = null;
             this.toolbar.instanceCount = null;
+            this.toolbar.structureMismatch = false;
             return;
         }
 
@@ -2969,6 +3086,7 @@ class EditorController {
             this.toolbar.instanceId = null;
             this.toolbar.instanceIndex = null;
             this.toolbar.instanceCount = null;
+            this.toolbar.structureMismatch = false;
             return;
         }
 
@@ -2977,6 +3095,13 @@ class EditorController {
         this.toolbar.instanceId = info.instanceId;
         this.toolbar.instanceIndex = templateInfo.instanceIds.indexOf(info.instanceId);
         this.toolbar.instanceCount = templateInfo.instanceIds.length;
+
+        // Check if this instance has a structure mismatch
+        const instanceElement = templateInfo.container.querySelector(
+            `[data-scms-instance="${info.instanceId}"]`,
+        );
+        this.toolbar.structureMismatch =
+            instanceElement?.hasAttribute("data-scms-structure-mismatch") ?? false;
     }
 
     /**
