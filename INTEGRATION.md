@@ -1,4 +1,4 @@
-# Streamlined CMS Integration Guide
+# Integration Guide
 
 This guide explains how to integrate Streamlined CMS into an HTML website to enable inline content editing.
 
@@ -251,3 +251,13 @@ If you don't add a `data-scms-signin` element, the SDK will automatically append
 - Use descriptive, kebab-case IDs: `hero-title`, `nav-link-1`, `team-photo`
 - IDs must be unique within their context (page, group, or template)
 - Template element IDs are scoped to each instance, so `name` in one team member doesn't conflict with `name` in another
+
+## SEO & Accessibility
+
+SEO attributes (alt text, title) and accessibility attributes (ARIA labels, roles) can be configured in the CMS after content is set up. No additional HTML markup is required.
+
+## Browser Support
+
+The SDK is designed to work on all modern browsers (desktop and mobile).
+
+<!-- TODO: Add specific browser version requirements -->

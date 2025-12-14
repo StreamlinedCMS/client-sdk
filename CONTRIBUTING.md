@@ -1,4 +1,76 @@
-# Contributing to Streamlined CMS Client SDK
+# Contributing
+
+## Project Architecture
+
+The SDK uses a **two-bundle strategy** to minimize impact on page load performance:
+
+### Sync Loader (`streamlined-cms.js`)
+
+A tiny IIFE script that runs synchronously when the page loads. It:
+
+1. Immediately hides editable elements to prevent flash of unstyled content (FOUC)
+2. Injects a preconnect hint for early TLS negotiation with the API
+3. Dynamically loads the ESM module after the critical path
+
+### ESM Module (`streamlined-cms.esm.js`)
+
+The main module, lazy-loaded after the page renders. Contains:
+
+- Lit-based web components (toolbar, modals)
+- Authentication and API integration
+- Editing functionality and state management
+
+### Why Two Bundles?
+
+- The sync loader is tiny (~2KB) and blocks only briefly to hide elements
+- The larger ESM module (~50KB) loads asynchronously without blocking render
+- Users see their page immediately while editing features load in the background
+
+### Shadow DOM Isolation
+
+All UI components use Shadow DOM to ensure:
+
+- SDK styles never leak into the host page
+- Host page styles never break the SDK toolbar/modals
+- Tailwind CSS is compiled into each component's shadow root
+
+## Project Structure
+
+```
+src/
+├── loader.ts              # Sync IIFE entry point
+├── lazy/
+│   └── index.ts           # ESM module entry point (initLazy)
+├── components/            # Lit web components
+│   ├── toolbar.ts         # Main editing toolbar
+│   ├── html-editor-modal.ts
+│   ├── link-editor-modal.ts
+│   ├── seo-modal.ts
+│   ├── accessibility-modal.ts
+│   ├── attributes-modal.ts
+│   ├── sign-in-link.ts
+│   ├── element-badge.ts
+│   ├── mode-toggle.ts
+│   ├── hold-button.ts
+│   └── styles.ts          # Shared Tailwind stylesheet
+├── types.ts               # TypeScript interfaces
+├── key-storage.ts         # localStorage persistence
+├── popup-manager.ts       # Cross-origin popup handling
+└── popup-connection.ts    # Penpal wrapper for popups
+
+tests/
+├── unit/                  # JSDOM-based unit tests
+└── browser/               # Playwright browser tests
+    ├── fixtures/          # Test HTML pages
+    └── server.ts          # Test HTTP server
+
+dist/                      # Build output
+├── streamlined-cms.js     # Sync loader
+├── streamlined-cms.min.js
+├── streamlined-cms.esm.js # ESM module
+├── streamlined-cms.esm.min.js
+└── *.d.ts                 # TypeScript declarations
+```
 
 ## Testing
 
@@ -75,6 +147,25 @@ browser = await chromium.launch({
 npm test
 ```
 
+## Adding New Features
+
+### New Editable Type
+
+To add a new editable type (like `data-scms-video`):
+
+1. Define the type in `src/types.ts` (add to `EditableType`)
+2. Add detection logic in `src/lazy/index.ts` where elements are scanned
+3. Create editing UI (modal or inline) in `src/components/`
+4. Add toolbar integration for the new type
+5. Write browser tests in `tests/browser/`
+
+### New Modal Component
+
+1. Create the component in `src/components/` extending `LitElement`
+2. Import the shared styles from `styles.ts`
+3. Register the custom element with a `streamlined-` prefix
+4. Add open/close logic in the toolbar component
+
 ## Code Formatting
 
 This project uses Prettier for code formatting:
@@ -100,3 +191,17 @@ npm run build
 # Build and watch for changes
 npm run dev
 ```
+
+## Pull Requests
+
+Before submitting a PR:
+
+1. **Run tests**: `npm test` (all tests must pass)
+2. **Format code**: `npm run format`
+3. **Test in browser**: `npm run demo` and manually verify your changes
+4. **Write meaningful commits**: Describe what changed and why
+5. **Keep PRs focused**: One feature or fix per PR when possible
+
+For bug fixes, include a test that would have caught the bug.
+
+For new features, include tests and update INTEGRATION.md if the feature is user-facing.

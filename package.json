@@ -11,6 +11,7 @@
     "access": "public"
   },
   "scripts": {
+    "postinstall": "npx playwright install chromium",
     "build": "rollup -c",
     "dev": "rollup -c -w",
     "demo": "npm run build && ln -sfn ../dist demo/dist && vite --config vite.demo.config.ts --host",
@@ -20,8 +21,9 @@
     "cdn:publish:PRODUCTION": "echo '⚠️  PUBLISHING TO PRODUCTION CDN' && read -p 'Type YES to continue: ' c && [ \"$c\" = 'YES' ] && node scripts/cdn-publish.js production",
     "cdn:purge:staging": "node scripts/cdn-purge.js staging",
     "cdn:purge:PRODUCTION": "echo '⚠️  PURGING PRODUCTION CDN CACHE' && read -p 'Type YES to continue: ' c && [ \"$c\" = 'YES' ] && node scripts/cdn-purge.js production",
-    "test": "vitest run",
+    "test": "npm run test:unit && npm run test:browser",
     "test:unit": "vitest run tests/unit",
+    "pretest:browser": "npm run build",
     "test:browser": "vitest run tests/browser",
     "test:watch": "vitest",
     "test:browser:watch": "vitest tests/browser",
