@@ -1838,3 +1838,83 @@ test("editing and saving instance=editable element works", async () => {
     const reloadedItem = page.locator('[data-scms-template="checklist"] li').first();
     expect(await reloadedItem.textContent()).toBe("Updated task");
 });
+
+// Bug fix: HTML-derived template items should be saved when order changes
+
+test("adding new instance saves existing HTML-derived items", async () => {
+    // This test verifies the fix for the bug where existing template items
+    // derived from HTML (not from API) were not being saved when a new item
+    // was added and saved. The order would reference 4 items but only the
+    // new item's content would be saved, leaving the original 3 empty.
+    server.clearContent();
+
+    await page.goto(testUrl);
+    await page.waitForSelector("scms-toolbar");
+
+    // The features template has 3 children in the HTML with default content
+    const featuresContainer = page.locator('[data-scms-template="features"]');
+    let featureItems = featuresContainer.locator(".feature-item");
+
+    // Verify initial state: 3 HTML-derived items
+    expect(await featureItems.count()).toBe(3);
+    expect(await featureItems.nth(0).locator('[data-scms-text="feature"]').textContent()).toBe(
+        "Feature One",
+    );
+    expect(await featureItems.nth(1).locator('[data-scms-text="feature"]').textContent()).toBe(
+        "Feature Two",
+    );
+    expect(await featureItems.nth(2).locator('[data-scms-text="feature"]').textContent()).toBe(
+        "Feature Three",
+    );
+
+    // Add a new instance
+    const addButton = featuresContainer.locator(".scms-template-add");
+    await addButton.click();
+
+    // Should now have 4 items
+    featureItems = featuresContainer.locator(".feature-item");
+    expect(await featureItems.count()).toBe(4);
+
+    // Edit the new item
+    const newFeature = featureItems.nth(3).locator('[data-scms-text="feature"]');
+    await newFeature.click();
+    await newFeature.fill("Feature Four");
+
+    // Save
+    const saveButton = page.locator("scms-toolbar").locator("button:has-text('Save')");
+    await saveButton.click();
+
+    // Wait for save to complete
+    await page.waitForFunction(
+        () => {
+            const feature = document
+                .querySelectorAll('[data-scms-template="features"] .feature-item')[3]
+                ?.querySelector('[data-scms-text="feature"]');
+            return feature && !feature.classList.contains("streamlined-editing");
+        },
+        { timeout: 3000 },
+    );
+
+    // Reload and verify ALL 4 items persist (not just the new one)
+    await page.reload();
+    await page.waitForSelector(".streamlined-editable");
+
+    const reloadedFeatures = page.locator('[data-scms-template="features"] .feature-item');
+
+    // Should have 4 items
+    expect(await reloadedFeatures.count()).toBe(4);
+
+    // All 4 items should have their content (the 3 original HTML-derived + 1 new)
+    expect(
+        await reloadedFeatures.nth(0).locator('[data-scms-text="feature"]').textContent(),
+    ).toBe("Feature One");
+    expect(
+        await reloadedFeatures.nth(1).locator('[data-scms-text="feature"]').textContent(),
+    ).toBe("Feature Two");
+    expect(
+        await reloadedFeatures.nth(2).locator('[data-scms-text="feature"]').textContent(),
+    ).toBe("Feature Three");
+    expect(
+        await reloadedFeatures.nth(3).locator('[data-scms-text="feature"]').textContent(),
+    ).toBe("Feature Four");
+});

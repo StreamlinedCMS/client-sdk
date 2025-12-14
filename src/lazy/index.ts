@@ -1806,6 +1806,53 @@ class EditorController {
     }
 
     /**
+     * Get template elements that have never been saved to the API.
+     * These are elements derived from HTML that need to be persisted when
+     * the template order changes (e.g., when adding a new item to a list
+     * that already had HTML-defined items).
+     *
+     * Only returns elements for templates that have order changes, since
+     * that's when we need to ensure all items are persisted.
+     */
+    private getUnsavedTemplateElements(
+        templatesWithOrderChanges: string[],
+    ): Map<string, { content: string; info: EditableElementInfo }> {
+        const unsaved = new Map<string, { content: string; info: EditableElementInfo }>();
+
+        // Build a set of template IDs with order changes for fast lookup
+        const changedTemplates = new Set(templatesWithOrderChanges);
+        if (changedTemplates.size === 0) {
+            return unsaved;
+        }
+
+        // Check each editable element
+        this.editableElements.forEach((infos, key) => {
+            const info = infos[0];
+            if (!info || !info.templateId || !info.instanceId) {
+                return; // Not a template element
+            }
+
+            // Only include elements from templates with order changes
+            if (!changedTemplates.has(info.templateId)) {
+                return;
+            }
+
+            // Skip if already saved to API
+            if (this.savedContentKeys.has(key)) {
+                return;
+            }
+
+            // Get the current content
+            const content = this.currentContent.get(key);
+            if (content !== undefined) {
+                unsaved.set(key, { content, info });
+            }
+        });
+
+        return unsaved;
+    }
+
+    /**
      * Check if there are any unsaved changes (dirty elements, pending deletes, or order changes)
      */
     private hasUnsavedChanges(): boolean {
@@ -1825,7 +1872,12 @@ class EditorController {
     private async handleSave(): Promise<void> {
         const dirtyElements = this.getDirtyElements();
         const pendingDeletes = this.getPendingDeletes();
-        const hasOrderChanges = this.getTemplatesWithOrderChanges().length > 0;
+        const templatesWithOrderChanges = this.getTemplatesWithOrderChanges();
+        const hasOrderChanges = templatesWithOrderChanges.length > 0;
+
+        // Get unsaved template elements (HTML-derived items that need to be persisted
+        // when the template order changes)
+        const unsavedTemplateElements = this.getUnsavedTemplateElements(templatesWithOrderChanges);
 
         if (dirtyElements.size === 0 && pendingDeletes.length === 0 && !hasOrderChanges) {
             return;
@@ -1836,6 +1888,7 @@ class EditorController {
 
         this.log.debug("Saving changes", {
             dirtyCount: dirtyElements.size,
+            unsavedTemplateCount: unsavedTemplateElements.size,
             deleteCount: pendingDeletes.length,
             orderChanges: hasOrderChanges,
         });
@@ -1857,8 +1910,12 @@ class EditorController {
         const deleted: string[] = [];
 
         try {
-            // 1. Save all dirty elements in parallel
-            const savePromises = Array.from(dirtyElements.entries()).map(
+            // 1. Save all dirty elements + unsaved template elements in parallel
+            // Combine dirty elements with unsaved template elements (dirty takes precedence if overlap)
+            const elementsToSave = new Map(unsavedTemplateElements);
+            dirtyElements.forEach((value, key) => elementsToSave.set(key, value));
+
+            const savePromises = Array.from(elementsToSave.entries()).map(
                 async ([key, { content, info }]) => {
                     const storageElementId =
                         info.templateId !== null && info.instanceId !== null
@@ -1889,6 +1946,8 @@ class EditorController {
 
                     // Update original content to saved version
                     this.originalContent.set(key, content);
+                    // Mark as saved in API so it won't be included in unsavedTemplateElements next time
+                    this.savedContentKeys.add(key);
                     saved.push(key);
                 },
             );
