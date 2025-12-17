@@ -101,12 +101,8 @@ import type { ElementAttributes } from "../types.js";
 const TOOLBAR_HEIGHT_DESKTOP = 48;
 const TOOLBAR_HEIGHT_MOBILE = 56;
 
-// Window property for beforeunload handler tracking (survives Vite HMR)
-declare global {
-    interface Window {
-        __scms_beforeUnloadHandler?: (e: BeforeUnloadEvent) => void;
-    }
-}
+// localStorage key for draft persistence
+const DRAFT_STORAGE_KEY = "scms_draft";
 
 interface EditableElementInfo {
     element: HTMLElement;
@@ -289,6 +285,9 @@ class EditorController {
 
         // Then scan editable elements (needs instance IDs to build correct keys)
         this.scanEditableElements();
+
+        // Restore any draft from localStorage (unsaved changes from previous session)
+        this.restoreDraftFromLocalStorage();
 
         // Check for mock auth
         if (this.config.mockAuth?.enabled) {
@@ -788,12 +787,6 @@ class EditorController {
         this.updateToolbarTemplateContext();
     };
 
-    private handleBeforeUnload = (e: BeforeUnloadEvent): void => {
-        if (this.hasUnsavedChanges()) {
-            e.preventDefault();
-        }
-    };
-
     private async handleSignIn(): Promise<void> {
         this.log.debug("Opening login popup");
 
@@ -932,14 +925,6 @@ class EditorController {
         // Add click-outside handler to deselect elements
         document.addEventListener("click", this.handleDocumentClick);
 
-        // Warn before leaving page with unsaved changes
-        // Remove any existing handler first (window property survives Vite HMR)
-        if (window.__scms_beforeUnloadHandler) {
-            window.removeEventListener("beforeunload", window.__scms_beforeUnloadHandler);
-        }
-        window.__scms_beforeUnloadHandler = this.handleBeforeUnload;
-        window.addEventListener("beforeunload", this.handleBeforeUnload);
-
         this.injectEditStyles();
         this.showTemplateControls();
     }
@@ -965,12 +950,6 @@ class EditorController {
 
         // Remove click-outside handler
         document.removeEventListener("click", this.handleDocumentClick);
-
-        // Remove beforeunload handler and clear window reference
-        window.removeEventListener("beforeunload", this.handleBeforeUnload);
-        if (window.__scms_beforeUnloadHandler === this.handleBeforeUnload) {
-            window.__scms_beforeUnloadHandler = undefined;
-        }
 
         this.hideTemplateControls();
         this.deselectElement();
@@ -1867,6 +1846,333 @@ class EditorController {
         if (this.toolbar) {
             this.toolbar.hasChanges = this.hasUnsavedChanges();
         }
+        this.saveDraftToLocalStorage();
+    }
+
+    /**
+     * Save current unsaved changes to localStorage for draft recovery.
+     * Stores content changes and pending deletes so they can be restored
+     * if the page is accidentally closed.
+     */
+    private saveDraftToLocalStorage(): void {
+        const draft: { content: Record<string, string>; deleted: string[] } = {
+            content: {},
+            deleted: [],
+        };
+
+        // Collect all content changes (currentContent differs from originalContent)
+        this.currentContent.forEach((current, key) => {
+            const original = this.originalContent.get(key);
+            if (current !== original) {
+                draft.content[key] = current;
+            }
+        });
+
+        // Collect pending deletes
+        draft.deleted = this.getPendingDeletes();
+
+        // If no changes, remove draft from storage
+        if (Object.keys(draft.content).length === 0 && draft.deleted.length === 0) {
+            localStorage.removeItem(DRAFT_STORAGE_KEY);
+            return;
+        }
+
+        // Save draft to localStorage
+        try {
+            localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft));
+        } catch (error) {
+            this.log.warn("Failed to save draft to localStorage", error);
+        }
+    }
+
+    /**
+     * Restore unsaved changes from localStorage draft.
+     * Called during initialization to recover work if the page was accidentally closed.
+     */
+    private restoreDraftFromLocalStorage(): void {
+        let draft: { content: Record<string, string>; deleted: string[] };
+
+        try {
+            const stored = localStorage.getItem(DRAFT_STORAGE_KEY);
+            if (!stored) return;
+            draft = JSON.parse(stored);
+        } catch (error) {
+            this.log.warn("Failed to load draft from localStorage", error);
+            return;
+        }
+
+        // Validate draft structure
+        if (!draft || typeof draft.content !== "object" || !Array.isArray(draft.deleted)) {
+            this.log.warn("Invalid draft structure in localStorage");
+            localStorage.removeItem(DRAFT_STORAGE_KEY);
+            return;
+        }
+
+        const hasContent = Object.keys(draft.content).length > 0;
+        const hasDeletes = draft.deleted.length > 0;
+
+        if (!hasContent && !hasDeletes) {
+            localStorage.removeItem(DRAFT_STORAGE_KEY);
+            return;
+        }
+
+        this.log.info("Restoring draft from localStorage", {
+            contentKeys: Object.keys(draft.content).length,
+            deleteKeys: draft.deleted.length,
+        });
+
+        // Step 1: Reconcile template instances based on _order keys in draft
+        this.reconcileTemplateInstances(draft.content);
+
+        // Step 2: Apply content changes
+        for (const [key, value] of Object.entries(draft.content)) {
+            // Skip _order keys - they were handled in reconciliation
+            if (key.endsWith("._order") || key.includes(":") && key.split(":")[1].endsWith("._order")) {
+                continue;
+            }
+
+            this.currentContent.set(key, value);
+            this.syncAllElementsFromContent(key);
+        }
+
+        // Step 3: Apply deletes
+        for (const key of draft.deleted) {
+            this.currentContent.delete(key);
+        }
+
+        this.log.info("Draft restored successfully");
+    }
+
+    /**
+     * Reconcile template instances based on _order keys from draft.
+     * Adds missing instances and removes extra instances to match draft state.
+     */
+    private reconcileTemplateInstances(draftContent: Record<string, string>): void {
+        // Find all _order keys in the draft
+        for (const [key, value] of Object.entries(draftContent)) {
+            // Match keys like "templateId._order" or "groupId:templateId._order"
+            let templateId: string;
+            if (key.endsWith("._order")) {
+                if (key.includes(":")) {
+                    // Grouped: "groupId:templateId._order"
+                    const afterColon = key.split(":")[1];
+                    templateId = afterColon.replace("._order", "");
+                } else {
+                    // Ungrouped: "templateId._order"
+                    templateId = key.replace("._order", "");
+                }
+            } else {
+                continue; // Not an order key
+            }
+
+            const templateInfo = this.templates.get(templateId);
+            if (!templateInfo) {
+                this.log.warn("Template not found for draft order key", { templateId, key });
+                continue;
+            }
+
+            // Parse the draft order value
+            let draftInstanceIds: string[];
+            try {
+                const parsed = JSON.parse(value);
+                if (parsed.type === "order" && Array.isArray(parsed.value)) {
+                    draftInstanceIds = parsed.value;
+                } else {
+                    this.log.warn("Invalid order format in draft", { key, value });
+                    continue;
+                }
+            } catch {
+                this.log.warn("Failed to parse order value in draft", { key, value });
+                continue;
+            }
+
+            const currentInstanceIds = [...templateInfo.instanceIds];
+            const currentSet = new Set(currentInstanceIds);
+            const draftSet = new Set(draftInstanceIds);
+
+            // Find instances to add (in draft but not in current DOM)
+            const toAdd = draftInstanceIds.filter((id) => !currentSet.has(id));
+
+            // Find instances to remove (in current DOM but not in draft)
+            const toRemove = currentInstanceIds.filter((id) => !draftSet.has(id));
+
+            this.log.debug("Reconciling template instances", {
+                templateId,
+                current: currentInstanceIds,
+                draft: draftInstanceIds,
+                toAdd,
+                toRemove,
+            });
+
+            // Add missing instances
+            for (const instanceId of toAdd) {
+                this.addInstanceWithId(templateId, instanceId);
+            }
+
+            // Remove extra instances (but never remove the last one)
+            for (const instanceId of toRemove) {
+                if (templateInfo.instanceCount > 1) {
+                    this.removeInstanceSync(templateId, instanceId);
+                }
+            }
+
+            // Reorder to match draft order
+            this.reorderInstances(templateId, draftInstanceIds);
+
+            // Update order content to match draft
+            this.currentContent.set(key, value);
+        }
+    }
+
+    /**
+     * Add a template instance with a specific ID (for draft restoration).
+     * Similar to addInstance() but uses a provided ID instead of generating one.
+     */
+    private addInstanceWithId(templateId: string, instanceId: string): void {
+        const templateInfo = this.templates.get(templateId);
+        if (!templateInfo) {
+            this.log.error("Template not found", { templateId });
+            return;
+        }
+
+        const { container, templateHtml, groupId } = templateInfo;
+
+        // Create new instance from original template HTML
+        const tempDiv = document.createElement("div");
+        tempDiv.innerHTML = templateHtml;
+        const clone = tempDiv.firstElementChild as HTMLElement;
+        if (!clone) {
+            this.log.error("Failed to create clone from template HTML");
+            return;
+        }
+
+        clone.setAttribute("data-scms-instance", instanceId);
+        clone.removeAttribute("data-scms-template");
+
+        // Add placeholder to image elements without src
+        clone.querySelectorAll<HTMLImageElement>("img[data-scms-image]").forEach((img) => {
+            if (!img.src) {
+                img.src = IMAGE_PLACEHOLDER_DATA_URI;
+            }
+        });
+        if (
+            clone instanceof HTMLImageElement &&
+            clone.hasAttribute("data-scms-image") &&
+            !clone.src
+        ) {
+            clone.src = IMAGE_PLACEHOLDER_DATA_URI;
+        }
+
+        // Insert at end of container (will be reordered later)
+        const addButton = this.templateAddButtons.get(templateId);
+        if (addButton && addButton.parentElement === container) {
+            container.insertBefore(clone, addButton);
+        } else {
+            container.appendChild(clone);
+        }
+
+        // Update instance tracking
+        templateInfo.instanceIds.push(instanceId);
+        templateInfo.instanceCount = templateInfo.instanceIds.length;
+
+        // Register editable elements in the new instance
+        this.registerInstanceElements(clone, templateId, instanceId, groupId);
+
+        this.log.debug("Added template instance from draft", { templateId, instanceId });
+    }
+
+    /**
+     * Remove a template instance synchronously (for draft restoration).
+     * Similar to removeInstance() but without async operations.
+     */
+    private removeInstanceSync(templateId: string, instanceId: string): void {
+        const templateInfo = this.templates.get(templateId);
+        if (!templateInfo) return;
+
+        if (templateInfo.instanceCount <= 1) return;
+
+        const { container } = templateInfo;
+
+        const instanceElement = container.querySelector<HTMLElement>(
+            `[data-scms-instance="${instanceId}"]`,
+        );
+        if (!instanceElement) return;
+
+        // Collect element keys for this instance
+        const keysToDelete: string[] = [];
+        const selector = "[data-scms-text], [data-scms-html], [data-scms-image], [data-scms-link]";
+        const descendants = Array.from(instanceElement.querySelectorAll<HTMLElement>(selector));
+        const elements = instanceElement.matches(selector)
+            ? [instanceElement, ...descendants]
+            : descendants;
+        elements.forEach((el) => {
+            const info = this.getEditableInfo(el);
+            if (info) {
+                const context = this.getStorageContext(el);
+                const key = this.buildStorageKey(context, info.id);
+                keysToDelete.push(key);
+            }
+        });
+
+        // Remove from DOM
+        instanceElement.remove();
+
+        // Update tracking
+        keysToDelete.forEach((key) => {
+            const infos = this.editableElements.get(key);
+            if (infos) {
+                const remaining = infos.filter((info) => info.instanceId !== instanceId);
+                if (remaining.length > 0) {
+                    this.editableElements.set(key, remaining);
+                } else {
+                    this.editableElements.delete(key);
+                    this.editableTypes.delete(key);
+                    this.currentContent.delete(key);
+                }
+            }
+        });
+
+        // Update instance tracking
+        templateInfo.instanceIds = templateInfo.instanceIds.filter((id) => id !== instanceId);
+        templateInfo.instanceCount = templateInfo.instanceIds.length;
+
+        this.log.debug("Removed template instance for draft", { templateId, instanceId });
+    }
+
+    /**
+     * Reorder template instances to match a specific order.
+     */
+    private reorderInstances(templateId: string, targetOrder: string[]): void {
+        const templateInfo = this.templates.get(templateId);
+        if (!templateInfo) return;
+
+        const { container } = templateInfo;
+
+        // Get current instance elements
+        const instanceElements = new Map<string, HTMLElement>();
+        container.querySelectorAll<HTMLElement>("[data-scms-instance]").forEach((el) => {
+            const id = el.getAttribute("data-scms-instance");
+            if (id) instanceElements.set(id, el);
+        });
+
+        // Find insertion point (before add button or at end)
+        const addButton = this.templateAddButtons.get(templateId);
+        const insertBefore = addButton?.parentElement === container ? addButton : null;
+
+        // Reorder by removing and re-inserting in correct order
+        for (const instanceId of targetOrder) {
+            const element = instanceElements.get(instanceId);
+            if (element) {
+                if (insertBefore) {
+                    container.insertBefore(element, insertBefore);
+                } else {
+                    container.appendChild(element);
+                }
+            }
+        }
+
+        // Update templateInfo.instanceIds to match
+        templateInfo.instanceIds = targetOrder.filter((id) => instanceElements.has(id));
     }
 
     private async handleSave(): Promise<void> {
@@ -2051,6 +2357,9 @@ class EditorController {
 
                 // Refresh saved content keys after successful save
                 await this.fetchSavedContentKeys();
+
+                // Clear draft from localStorage after successful save
+                localStorage.removeItem(DRAFT_STORAGE_KEY);
             }
 
             this.updateToolbarHasChanges();
