@@ -3,9 +3,11 @@
  *
  * Handles:
  * - Login popup for user authentication
- * - Media manager popup for file selection
  *
  * Uses PopupConnection for safe penpal lifecycle management.
+ *
+ * Note: Media manager is now handled by the MediaManagerModal component
+ * which uses a persistent iframe instead of a popup.
  */
 
 import { PopupConnection } from "./popup-connection.js";
@@ -33,7 +35,6 @@ export interface MediaFile {
 
 export class PopupManager {
     private loginConnection: PopupConnection<string>;
-    private mediaConnection: PopupConnection<MediaFile>;
 
     constructor(config: PopupConfig) {
         const origin = new URL(config.appUrl).origin;
@@ -46,15 +47,6 @@ export class PopupManager {
             allowedOrigins: [origin],
             timeout: 300000, // 5 minutes for user to complete login
         });
-
-        this.mediaConnection = new PopupConnection<MediaFile>({
-            url: `${config.appUrl}/media?appId=${encodeURIComponent(config.appId)}`,
-            name: "scms-media",
-            width: 800,
-            height: 600,
-            allowedOrigins: [origin],
-            timeout: 600000, // 10 minutes for user to select media
-        });
     }
 
     /**
@@ -64,17 +56,6 @@ export class PopupManager {
     async openLoginPopup(): Promise<string | null> {
         return this.loginConnection.open({
             receiveAuthResult: (result: { key: string }) => result.key,
-        });
-    }
-
-    /**
-     * Open media manager popup and wait for selection
-     * Returns selected file on success, null if user closes popup or cancels
-     */
-    async openMediaManager(): Promise<MediaFile | null> {
-        return this.mediaConnection.open({
-            receiveMediaSelection: (result: { file: MediaFile }) => result.file,
-            receiveMediaCancel: () => null,
         });
     }
 }

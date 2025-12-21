@@ -89,12 +89,14 @@ import "../components/link-editor-modal.js";
 import "../components/seo-modal.js";
 import "../components/accessibility-modal.js";
 import "../components/attributes-modal.js";
+import "../components/media-manager-modal.js";
 import type { Toolbar } from "../components/toolbar.js";
 import type { HtmlEditorModal } from "../components/html-editor-modal.js";
 import type { LinkEditorModal, LinkData } from "../components/link-editor-modal.js";
 import type { SeoModal } from "../components/seo-modal.js";
 import type { AccessibilityModal } from "../components/accessibility-modal.js";
 import type { AttributesModal } from "../components/attributes-modal.js";
+import type { MediaManagerModal } from "../components/media-manager-modal.js";
 import type { ElementAttributes } from "../types.js";
 
 // Toolbar height constants
@@ -163,6 +165,7 @@ class EditorController {
     private seoModal: SeoModal | null = null;
     private accessibilityModal: AccessibilityModal | null = null;
     private attributesModal: AttributesModal | null = null;
+    private mediaManagerModal: MediaManagerModal | null = null;
     private saving = false;
     // Store attributes per element (keyed by composite key)
     private elementAttributes: Map<string, ElementAttributes> = new Map();
@@ -293,6 +296,7 @@ class EditorController {
         if (this.config.mockAuth?.enabled) {
             this.apiKey = "mock-api-key";
             this.log.debug("Mock authentication enabled");
+            this.initMediaManagerModal();
             this.setMode("author");
             const success = await this.fetchSavedContentKeys();
             if (!success) {
@@ -304,6 +308,9 @@ class EditorController {
         // Set up auth UI based on stored state
         // This validates stored API key and sets this.apiKey if valid
         await this.setupAuthUI();
+
+        // Initialize media manager modal (persistent, reused across selections)
+        this.initMediaManagerModal();
 
         this.log.info("Lazy module initialized", {
             editableCount: this.editableElements.size,
@@ -663,6 +670,7 @@ class EditorController {
             }
 
             this.apiKey = storedKey;
+            this.updateMediaManagerApiKey();
 
             // Set up all custom triggers as sign-out
             const customTriggers = document.querySelectorAll("[data-scms-signin]");
@@ -793,6 +801,7 @@ class EditorController {
         const key = await this.popupManager.openLoginPopup();
         if (key) {
             this.apiKey = key;
+            this.updateMediaManagerApiKey();
             this.keyStorage.storeKey(key);
 
             // Remove default sign-in link if present
@@ -1165,6 +1174,7 @@ class EditorController {
 
         this.keyStorage.clearStoredKey();
         this.apiKey = null;
+        this.updateMediaManagerApiKey();
         this.currentMode = "viewer";
 
         this.disableEditing();
@@ -2957,12 +2967,38 @@ class EditorController {
     }
 
     /**
-     * Open media manager popup for file selection
-     * Returns selected file on success, null if user cancels or closes popup
+     * Initialize the persistent media manager modal
+     */
+    private initMediaManagerModal(): void {
+        const modal = document.createElement("scms-media-manager-modal") as MediaManagerModal;
+        modal.appUrl = this.config.appUrl;
+        modal.appId = this.config.appId;
+        if (this.apiKey) {
+            modal.apiKey = this.apiKey;
+        }
+        document.body.appendChild(modal);
+        this.mediaManagerModal = modal;
+        this.log.debug("Media manager modal initialized");
+    }
+
+    private updateMediaManagerApiKey(): void {
+        if (this.mediaManagerModal) {
+            this.mediaManagerModal.apiKey = this.apiKey || "";
+        }
+    }
+
+    /**
+     * Open media manager for file selection
+     * Returns selected file on success, null if user cancels or closes
      */
     public async openMediaManager(): Promise<MediaFile | null> {
-        this.log.debug("Opening media manager popup");
-        const file = await this.popupManager.openMediaManager();
+        if (!this.mediaManagerModal) {
+            this.log.warn("Media manager modal not initialized");
+            return null;
+        }
+
+        this.log.debug("Opening media manager");
+        const file = await this.mediaManagerModal.selectMedia();
         if (file) {
             this.log.debug("Media file selected", { fileId: file.fileId, filename: file.filename });
         } else {
