@@ -32,12 +32,18 @@
     preconnect.crossOrigin = "anonymous";
     document.head.appendChild(preconnect);
 
-    // Inject hiding styles immediately
-    const style = document.createElement("style");
-    style.id = "streamlined-cms-hiding";
-    style.textContent =
+    // Inject hiding styles immediately (append if style already exists)
+    const hidingCss =
         "[data-scms-text],[data-scms-html],[data-scms-image],[data-scms-link]{visibility:hidden}";
-    document.head.appendChild(style);
+    let style = document.getElementById("streamlined-cms-hiding") as HTMLStyleElement | null;
+    if (style) {
+        style.textContent += hidingCss;
+    } else {
+        style = document.createElement("style");
+        style.id = "streamlined-cms-hiding";
+        style.textContent = hidingCss;
+        document.head.appendChild(style);
+    }
 
     // Determine ESM bundle URL (same directory as loader)
     const loaderSrc = loaderScript.src;
@@ -663,7 +669,7 @@
      * Remove hiding styles to reveal content
      */
     function removeHidingStyles(): void {
-        style.remove();
+        style?.remove();
     }
 
     /**
