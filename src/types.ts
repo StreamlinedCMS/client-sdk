@@ -87,6 +87,34 @@ export interface SaveResponse {
 }
 
 /**
+ * Input for creating/updating a content element in batch operations
+ */
+export interface ContentElementInput {
+    content: string;
+}
+
+/**
+ * Batch update request body for PATCH /apps/{appId}/content
+ * Set element value to null to delete it
+ */
+export interface BatchUpdateRequest {
+    elements?: Record<string, ContentElementInput | null>;
+    groups?: Record<string, { elements: Record<string, ContentElementInput | null> }>;
+}
+
+/**
+ * Batch update response from PATCH /apps/{appId}/content
+ */
+export interface BatchUpdateResponse {
+    elements: Record<string, ContentElement>;
+    groups: Record<string, { elements: Record<string, ContentElement> }>;
+    deleted: {
+        elements: string[];
+        groups: Record<string, string[]>;
+    };
+}
+
+/**
  * Editable element types
  */
 export type EditableType = "text" | "html" | "image" | "link";

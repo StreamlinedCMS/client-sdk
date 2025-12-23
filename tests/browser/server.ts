@@ -88,7 +88,7 @@ export class TestServer {
         if (req.method === "OPTIONS") {
             res.writeHead(204, {
                 "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "GET, HEAD, PUT, DELETE, OPTIONS",
+                "Access-Control-Allow-Methods": "GET, HEAD, PUT, PATCH, DELETE, OPTIONS",
                 "Access-Control-Allow-Headers": "Content-Type, Authorization",
             });
             res.end();
@@ -132,9 +132,9 @@ export class TestServer {
             return true;
         }
 
-        // Match: /apps/{appId}/content (GET or HEAD)
+        // Match: /apps/{appId}/content (GET, HEAD, or PATCH)
         const contentListMatch = pathname.match(/^\/apps\/([^/]+)\/content$/);
-        if (contentListMatch && (req.method === "GET" || req.method === "HEAD")) {
+        if (contentListMatch && (req.method === "GET" || req.method === "HEAD" || req.method === "PATCH")) {
             // Check for invalid API key (used for auth validation)
             if (this.checkAuthAndReject(req, res)) {
                 return true;
@@ -151,7 +151,83 @@ export class TestServer {
                 return true;
             }
 
-            // Build key-value response format: { elements: {...}, groups: {...} }
+            // PATCH request - batch update
+            if (req.method === "PATCH") {
+                const body = await this.readBody(req);
+                const data = JSON.parse(body) as {
+                    elements?: Record<string, { content: string } | null>;
+                    groups?: Record<string, { elements: Record<string, { content: string } | null> }>;
+                };
+
+                const responseElements: Record<string, ContentElement> = {};
+                const responseGroups: Record<string, { elements: Record<string, ContentElement> }> = {};
+                const deletedElements: string[] = [];
+                const deletedGroups: Record<string, string[]> = {};
+
+                // Process ungrouped elements
+                if (data.elements) {
+                    for (const [elementId, value] of Object.entries(data.elements)) {
+                        const key = `${appId}:${elementId}`;
+                        if (value === null) {
+                            // Delete
+                            this.contentStore.delete(key);
+                            deletedElements.push(elementId);
+                        } else {
+                            // Create/update
+                            const element: ContentElement = {
+                                content: value.content,
+                                updatedAt: new Date().toISOString(),
+                            };
+                            this.contentStore.set(key, element);
+                            responseElements[elementId] = element;
+                        }
+                    }
+                }
+
+                // Process grouped elements
+                if (data.groups) {
+                    for (const [groupId, group] of Object.entries(data.groups)) {
+                        for (const [elementId, value] of Object.entries(group.elements)) {
+                            const key = `${appId}:${groupId}:${elementId}`;
+                            if (value === null) {
+                                // Delete
+                                this.contentStore.delete(key);
+                                if (!deletedGroups[groupId]) {
+                                    deletedGroups[groupId] = [];
+                                }
+                                deletedGroups[groupId].push(elementId);
+                            } else {
+                                // Create/update
+                                const element: ContentElement = {
+                                    content: value.content,
+                                    updatedAt: new Date().toISOString(),
+                                };
+                                this.contentStore.set(key, element);
+                                if (!responseGroups[groupId]) {
+                                    responseGroups[groupId] = { elements: {} };
+                                }
+                                responseGroups[groupId].elements[elementId] = element;
+                            }
+                        }
+                    }
+                }
+
+                res.writeHead(200, {
+                    "Content-Type": "application/json",
+                    "Access-Control-Allow-Origin": "*",
+                });
+                res.end(JSON.stringify({
+                    elements: responseElements,
+                    groups: responseGroups,
+                    deleted: {
+                        elements: deletedElements,
+                        groups: deletedGroups,
+                    },
+                }));
+                return true;
+            }
+
+            // GET request - Build key-value response format: { elements: {...}, groups: {...} }
             const elements: Record<string, ContentElement> = {};
             const groups: Record<string, { elements: Record<string, ContentElement> }> = {};
 

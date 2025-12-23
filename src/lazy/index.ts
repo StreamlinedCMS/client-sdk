@@ -20,7 +20,10 @@ import type {
     HtmlContentData,
     ImageContentData,
     LinkContentData,
+    BatchUpdateRequest,
+    BatchUpdateResponse,
 } from "../types.js";
+import { parseTemplateKey } from "../types.js";
 
 /**
  * Placeholder image for new template instances (gray background with "add image" icon at 50% centered)
@@ -36,6 +39,143 @@ class AuthError extends Error {
         super(message);
         this.name = "AuthError";
     }
+}
+
+/**
+ * Maximum number of operations allowed in a single batch request
+ */
+const MAX_BATCH_OPERATIONS = 100;
+
+/**
+ * A single batch operation (save or delete)
+ */
+interface BatchOperation {
+    groupId: string | null;
+    elementId: string;
+    content: string | null; // null = delete
+}
+
+/**
+ * An atomic unit of operations that should stay together (e.g., template instance)
+ */
+interface AtomicUnit {
+    /** Unique identifier for grouping (e.g., "templateId.instanceId" or "single:elementId") */
+    unitId: string;
+    operations: BatchOperation[];
+}
+
+/**
+ * Group batch operations by atomic unit (template instances stay together)
+ */
+function groupByAtomicUnit(operations: BatchOperation[]): AtomicUnit[] {
+    const unitMap = new Map<string, BatchOperation[]>();
+
+    for (const op of operations) {
+        // Check if this is a template element by parsing the elementId
+        const parsed = parseTemplateKey(op.elementId);
+        let unitId: string;
+
+        if (parsed) {
+            // Template element: group by templateId.instanceId (with groupId prefix if grouped)
+            unitId = op.groupId
+                ? `${op.groupId}:${parsed.templateId}.${parsed.instanceId}`
+                : `${parsed.templateId}.${parsed.instanceId}`;
+        } else if (op.elementId.endsWith("._order")) {
+            // Order array: treat as its own unit (or group with template if we want)
+            // For simplicity, treat order arrays as their own atomic unit
+            unitId = op.groupId ? `${op.groupId}:${op.elementId}` : op.elementId;
+        } else {
+            // Non-template element: each is its own unit
+            unitId = op.groupId ? `single:${op.groupId}:${op.elementId}` : `single:${op.elementId}`;
+        }
+
+        const existing = unitMap.get(unitId);
+        if (existing) {
+            existing.push(op);
+        } else {
+            unitMap.set(unitId, [op]);
+        }
+    }
+
+    return Array.from(unitMap.entries()).map(([unitId, ops]) => ({
+        unitId,
+        operations: ops,
+    }));
+}
+
+/**
+ * Chunk atomic units into batches respecting the max operations limit.
+ * Units larger than the limit are split with a console warning.
+ */
+function chunkAtomicUnits(units: AtomicUnit[], maxOps: number): BatchOperation[][] {
+    const chunks: BatchOperation[][] = [];
+    let currentChunk: BatchOperation[] = [];
+
+    for (const unit of units) {
+        if (unit.operations.length > maxOps) {
+            // Large unit: warn and split it
+            console.warn(
+                `[StreamlinedCMS] Template instance "${unit.unitId}" has ${unit.operations.length} operations, ` +
+                    `exceeding the batch limit of ${maxOps}. It will be split across multiple requests, ` +
+                    `which may result in partial updates if an error occurs.`,
+            );
+
+            // Flush current chunk if not empty
+            if (currentChunk.length > 0) {
+                chunks.push(currentChunk);
+                currentChunk = [];
+            }
+
+            // Split the large unit into chunks
+            for (let i = 0; i < unit.operations.length; i += maxOps) {
+                chunks.push(unit.operations.slice(i, i + maxOps));
+            }
+        } else if (currentChunk.length + unit.operations.length > maxOps) {
+            // Adding this unit would exceed limit, start a new chunk
+            chunks.push(currentChunk);
+            currentChunk = [...unit.operations];
+        } else {
+            // Add unit to current chunk
+            currentChunk.push(...unit.operations);
+        }
+    }
+
+    // Don't forget the last chunk
+    if (currentChunk.length > 0) {
+        chunks.push(currentChunk);
+    }
+
+    return chunks;
+}
+
+/**
+ * Build a BatchUpdateRequest from a list of operations
+ */
+function buildBatchRequest(operations: BatchOperation[]): BatchUpdateRequest {
+    const request: BatchUpdateRequest = {};
+
+    for (const op of operations) {
+        const value = op.content !== null ? { content: op.content } : null;
+
+        if (op.groupId) {
+            // Grouped element
+            if (!request.groups) {
+                request.groups = {};
+            }
+            if (!request.groups[op.groupId]) {
+                request.groups[op.groupId] = { elements: {} };
+            }
+            request.groups[op.groupId].elements[op.elementId] = value;
+        } else {
+            // Ungrouped element
+            if (!request.elements) {
+                request.elements = {};
+            }
+            request.elements[op.elementId] = value;
+        }
+    }
+
+    return request;
 }
 
 /**
@@ -2297,133 +2437,140 @@ class EditorController {
         const deleted: string[] = [];
 
         try {
-            // 1. Save all dirty elements + unsaved template elements in parallel
-            // Combine dirty elements with unsaved template elements (dirty takes precedence if overlap)
+            // Collect all operations into a flat list
+            const operations: BatchOperation[] = [];
+
+            // 1. Collect save operations (dirty elements + unsaved template elements)
             const elementsToSave = new Map(unsavedTemplateElements);
             dirtyElements.forEach((value, key) => elementsToSave.set(key, value));
 
-            const savePromises = Array.from(elementsToSave.entries()).map(
-                async ([key, { content, info }]) => {
-                    const storageElementId =
-                        info.templateId !== null && info.instanceId !== null
-                            ? this.buildTemplateKey(
-                                  info.templateId,
-                                  info.instanceId,
-                                  info.elementId,
-                              )
-                            : info.elementId;
+            for (const [, { content, info }] of elementsToSave) {
+                const storageElementId =
+                    info.templateId !== null && info.instanceId !== null
+                        ? this.buildTemplateKey(info.templateId, info.instanceId, info.elementId)
+                        : info.elementId;
 
-                    const url = info.groupId
-                        ? `${this.config.apiUrl}/apps/${this.config.appId}/content/groups/${info.groupId}/elements/${storageElementId}`
-                        : `${this.config.apiUrl}/apps/${this.config.appId}/content/elements/${storageElementId}`;
-                    const response = await this.apiFetch(url, {
-                        method: "PUT",
-                        headers,
-                        body: JSON.stringify({ content }),
-                    });
-
-                    if (!response.ok) {
-                        if (response.status === 401 || response.status === 403) {
-                            throw new AuthError(`${key}: ${response.status} ${response.statusText}`);
-                        }
-                        throw new Error(`${key}: ${response.status} ${response.statusText}`);
-                    }
-
-                    await response.json();
-
-                    // Update original content to saved version
-                    this.originalContent.set(key, content);
-                    // Mark as saved in API so it won't be included in unsavedTemplateElements next time
-                    this.savedContentKeys.add(key);
-                    saved.push(key);
-                },
-            );
-
-            // 2. Delete pending deletes in parallel (derived from map comparison)
-            const deletePromises = pendingDeletes.map(async (key) => {
-                const { elementId, groupId } = this.parseStorageKey(key);
-
-                const url = groupId
-                    ? `${this.config.apiUrl}/apps/${this.config.appId}/content/groups/${groupId}/elements/${elementId}`
-                    : `${this.config.apiUrl}/apps/${this.config.appId}/content/elements/${elementId}`;
-
-                const response = await this.apiFetch(url, {
-                    method: "DELETE",
-                    headers: { Authorization: headers["Authorization"] },
+                operations.push({
+                    groupId: info.groupId,
+                    elementId: storageElementId,
+                    content: content,
                 });
+            }
 
-                if (!response.ok && response.status !== 404) {
-                    if (response.status === 401 || response.status === 403) {
-                        throw new AuthError(`Delete ${key}: ${response.status} ${response.statusText}`);
-                    }
-                    throw new Error(`Delete ${key}: ${response.status} ${response.statusText}`);
-                }
+            // 2. Collect delete operations
+            for (const key of pendingDeletes) {
+                const { elementId, groupId } = this.parseStorageKey(key);
+                operations.push({
+                    groupId,
+                    elementId,
+                    content: null, // null = delete
+                });
+            }
 
-                // Remove from tracking maps (currentContent already doesn't have it)
-                this.originalContent.delete(key);
-                this.savedContentKeys.delete(key);
-                deleted.push(key);
-            });
-
-            // 3. Save order arrays for templates that changed
-            const orderPromises = this.getTemplatesWithOrderChanges().map(async (templateId) => {
+            // 3. Collect order array operations
+            for (const templateId of templatesWithOrderChanges) {
                 const templateInfo = this.templates.get(templateId);
-                if (!templateInfo) return;
+                if (!templateInfo) continue;
 
                 const orderKey = `${templateId}._order`;
                 const content = JSON.stringify({ type: "order", value: templateInfo.instanceIds });
 
-                const url = templateInfo.groupId
-                    ? `${this.config.apiUrl}/apps/${this.config.appId}/content/groups/${templateInfo.groupId}/elements/${orderKey}`
-                    : `${this.config.apiUrl}/apps/${this.config.appId}/content/elements/${orderKey}`;
+                operations.push({
+                    groupId: templateInfo.groupId,
+                    elementId: orderKey,
+                    content,
+                });
+            }
 
-                const response = await this.apiFetch(url, {
-                    method: "PUT",
+            // Group by atomic unit (template instances stay together)
+            const atomicUnits = groupByAtomicUnit(operations);
+
+            // Chunk into batches respecting the max operations limit
+            const chunks = chunkAtomicUnits(atomicUnits, MAX_BATCH_OPERATIONS);
+
+            this.log.debug("Batch save", {
+                totalOperations: operations.length,
+                atomicUnits: atomicUnits.length,
+                chunks: chunks.length,
+            });
+
+            // Execute chunks sequentially
+            const batchUrl = `${this.config.apiUrl}/apps/${this.config.appId}/content`;
+
+            for (let i = 0; i < chunks.length; i++) {
+                const chunk = chunks[i];
+                const request = buildBatchRequest(chunk);
+
+                this.log.debug(`Executing batch ${i + 1}/${chunks.length}`, {
+                    operations: chunk.length,
+                });
+
+                const response = await this.apiFetch(batchUrl, {
+                    method: "PATCH",
                     headers,
-                    body: JSON.stringify({ content }),
+                    body: JSON.stringify(request),
                 });
 
                 if (!response.ok) {
                     if (response.status === 401 || response.status === 403) {
-                        throw new AuthError(
-                            `Order ${templateId}: ${response.status} ${response.statusText}`,
-                        );
+                        throw new AuthError(`Batch ${i + 1}: ${response.status} ${response.statusText}`);
                     }
-                    throw new Error(
-                        `Order ${templateId}: ${response.status} ${response.statusText}`,
-                    );
+                    throw new Error(`Batch ${i + 1}: ${response.status} ${response.statusText}`);
                 }
 
-                // Update original order to match current
-                const orderContentKey = templateInfo.groupId
-                    ? `${templateInfo.groupId}:${orderKey}`
-                    : orderKey;
-                this.originalContent.set(orderContentKey, content);
-                this.currentContent.set(orderContentKey, content);
-            });
+                const result = (await response.json()) as BatchUpdateResponse;
 
-            // Run all operations in parallel
-            const results = await Promise.allSettled([
-                ...savePromises,
-                ...deletePromises,
-                ...orderPromises,
-            ]);
-
-            let hasAuthError = false;
-            results.forEach((result) => {
-                if (result.status === "rejected") {
-                    if (result.reason instanceof AuthError) {
-                        hasAuthError = true;
-                    }
-                    errors.push(result.reason?.message || "Unknown error");
+                // Process saved elements from response
+                for (const [elementId, element] of Object.entries(result.elements)) {
+                    const key = elementId;
+                    this.originalContent.set(key, element.content);
+                    this.savedContentKeys.add(key);
+                    saved.push(key);
                 }
-            });
 
-            if (hasAuthError) {
-                this.log.error("Authentication failed during save", { errors });
-                alert("Your session has expired. Please sign in again to save your changes.");
-                this.signOut(true); // Skip "unsaved changes" confirmation
-                return;
+                // Process saved grouped elements from response
+                for (const [groupId, group] of Object.entries(result.groups)) {
+                    for (const [elementId, element] of Object.entries(group.elements)) {
+                        const key = `${groupId}:${elementId}`;
+                        this.originalContent.set(key, element.content);
+                        this.savedContentKeys.add(key);
+                        saved.push(key);
+                    }
+                }
+
+                // Process deleted elements from response
+                for (const elementId of result.deleted.elements) {
+                    const key = elementId;
+                    this.originalContent.delete(key);
+                    this.savedContentKeys.delete(key);
+                    deleted.push(key);
+                }
+
+                // Process deleted grouped elements from response
+                for (const [groupId, elementIds] of Object.entries(result.deleted.groups)) {
+                    for (const elementId of elementIds) {
+                        const key = `${groupId}:${elementId}`;
+                        this.originalContent.delete(key);
+                        this.savedContentKeys.delete(key);
+                        deleted.push(key);
+                    }
+                }
+
+                // Update currentContent for order arrays
+                for (const templateId of templatesWithOrderChanges) {
+                    const templateInfo = this.templates.get(templateId);
+                    if (!templateInfo) continue;
+
+                    const orderKey = `${templateId}._order`;
+                    const orderContentKey = templateInfo.groupId
+                        ? `${templateInfo.groupId}:${orderKey}`
+                        : orderKey;
+                    const orderContent = JSON.stringify({
+                        type: "order",
+                        value: templateInfo.instanceIds,
+                    });
+                    this.currentContent.set(orderContentKey, orderContent);
+                }
             }
 
             if (errors.length > 0) {
@@ -2445,6 +2592,12 @@ class EditorController {
 
             this.updateToolbarHasChanges();
         } catch (error) {
+            if (error instanceof AuthError) {
+                this.log.error("Authentication failed during save", { error: error.message });
+                alert("Your session has expired. Please sign in again to save your changes.");
+                this.signOut(true); // Skip "unsaved changes" confirmation
+                return;
+            }
             const errorMessage = error instanceof Error ? error.message : String(error);
             this.log.error("Failed to save content", error);
             alert(`Failed to save: ${errorMessage}\n\nCheck console for details.`);
