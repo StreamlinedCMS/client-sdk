@@ -2081,11 +2081,95 @@ class EditorController {
             deleted: [],
         };
 
-        // Collect all content changes (currentContent differs from originalContent)
+        // First pass: find templates where order changed AND have unsaved instance content
+        // These need ALL their unsaved content in the draft because HTML-derived
+        // instances get new random IDs on reload and we need full content to restore
+        const templatesWithUnsavedInstances = new Set<string>();
+        const groupsInAffectedTemplates = new Set<string>();
+        this.currentContent.forEach((current, key) => {
+            if (key.endsWith("._order")) {
+                const original = this.originalContent.get(key);
+
+                // Only consider templates where order has actually changed
+                if (current === original) {
+                    return;
+                }
+
+                // Parse the order to get instance IDs
+                let instanceIds: string[] = [];
+                try {
+                    const parsed = JSON.parse(current);
+                    if (parsed.type === "order" && Array.isArray(parsed.value)) {
+                        instanceIds = parsed.value;
+                    }
+                } catch {
+                    return;
+                }
+
+                // Key format: "templateId._order" or "groupId:templateId._order"
+                const prefix = key.slice(0, -"._order".length);
+
+                // Check if any instance in the order has content not saved to the API
+                // These are HTML-derived instances whose IDs will change on reload
+                const hasUnsavedInstances = instanceIds.some((instanceId) => {
+                    const instancePrefix = `${prefix}.${instanceId}.`;
+                    for (const [contentKey] of this.currentContent) {
+                        if (
+                            contentKey.startsWith(instancePrefix) &&
+                            !this.savedContentKeys.has(contentKey)
+                        ) {
+                            return true;
+                        }
+                    }
+                    return false;
+                });
+
+                if (hasUnsavedInstances) {
+                    templatesWithUnsavedInstances.add(prefix);
+
+                    // Also find groups inside this template - their content needs saving too
+                    const templateId = prefix.includes(":") ? prefix.split(":")[1] : prefix;
+                    const templateInfo = this.templates.get(templateId);
+                    if (templateInfo) {
+                        templateInfo.container
+                            .querySelectorAll<HTMLElement>("[data-scms-group]")
+                            .forEach((el) => {
+                                const groupId = el.getAttribute("data-scms-group");
+                                if (groupId) groupsInAffectedTemplates.add(groupId);
+                            });
+                    }
+                }
+            }
+        });
+
+        // Collect content to save
         this.currentContent.forEach((current, key) => {
             const original = this.originalContent.get(key);
+
+            // Always save if content differs from original
             if (current !== original) {
                 draft.content[key] = current;
+                return;
+            }
+
+            // For unchanged content: also save if it belongs to a template with unsaved instances
+            // AND is not already saved to the API (saved content will be restored from API)
+            // This ensures HTML-derived instance content is preserved across reloads
+            if (!key.endsWith("._order") && !this.savedContentKeys.has(key)) {
+                // Check template content keys (templateId.instanceId.elementId)
+                for (const prefix of templatesWithUnsavedInstances) {
+                    if (key.startsWith(prefix + ".")) {
+                        draft.content[key] = current;
+                        return;
+                    }
+                }
+                // Check group content keys (groupId:elementId) for groups inside affected templates
+                for (const groupId of groupsInAffectedTemplates) {
+                    if (key.startsWith(groupId + ":")) {
+                        draft.content[key] = current;
+                        return;
+                    }
+                }
             }
         });
 
@@ -2521,7 +2605,7 @@ class EditorController {
                 const result = (await response.json()) as BatchUpdateResponse;
 
                 // Process saved elements from response
-                for (const [elementId, element] of Object.entries(result.elements)) {
+                for (const [elementId, element] of Object.entries(result.elements ?? {})) {
                     const key = elementId;
                     this.originalContent.set(key, element.content);
                     this.savedContentKeys.add(key);
@@ -2529,7 +2613,7 @@ class EditorController {
                 }
 
                 // Process saved grouped elements from response
-                for (const [groupId, group] of Object.entries(result.groups)) {
+                for (const [groupId, group] of Object.entries(result.groups ?? {})) {
                     for (const [elementId, element] of Object.entries(group.elements)) {
                         const key = `${groupId}:${elementId}`;
                         this.originalContent.set(key, element.content);
@@ -2539,7 +2623,7 @@ class EditorController {
                 }
 
                 // Process deleted elements from response
-                for (const elementId of result.deleted.elements) {
+                for (const elementId of result.deleted?.elements ?? []) {
                     const key = elementId;
                     this.originalContent.delete(key);
                     this.savedContentKeys.delete(key);
@@ -2547,7 +2631,7 @@ class EditorController {
                 }
 
                 // Process deleted grouped elements from response
-                for (const [groupId, elementIds] of Object.entries(result.deleted.groups)) {
+                for (const [groupId, elementIds] of Object.entries(result.deleted?.groups ?? {})) {
                     for (const elementId of elementIds) {
                         const key = `${groupId}:${elementId}`;
                         this.originalContent.delete(key);
