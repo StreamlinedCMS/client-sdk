@@ -158,6 +158,7 @@ class EditorController {
     private currentContent: Map<string, string> = new Map();
     private selectedKey: string | null = null; // Currently selected element (visual highlight, toolbar shows info)
     private editingKey: string | null = null; // Currently editing element (contenteditable, focused)
+    private selectedInstance: HTMLElement | null = null; // Currently selected template instance (for mobile controls)
     private customSignInTriggers: Map<Element, string> = new Map(); // element -> original text
     private toolbar: Toolbar | null = null;
     private htmlEditorModal: HtmlEditorModal | null = null;
@@ -765,9 +766,17 @@ class EditorController {
     };
 
     private handleDocumentClick = (e: Event): void => {
-        if (!this.editingKey && !this.selectedKey) return;
-
         const target = e.target as Node;
+
+        // Check if clicking inside a template instance
+        const clickedInstance = (target as Element).closest?.("[data-scms-instance]") as HTMLElement | null;
+
+        // Deselect instance if clicking outside all instances
+        if (this.selectedInstance && !clickedInstance) {
+            this.deselectInstance();
+        }
+
+        if (!this.editingKey && !this.selectedKey) return;
 
         // Don't deselect if clicking inside an editable element
         for (const infos of this.editableElements.values()) {
@@ -961,6 +970,7 @@ class EditorController {
         document.removeEventListener("click", this.handleDocumentClick);
 
         this.hideTemplateControls();
+        this.deselectInstance();
         this.deselectElement();
         this.stopEditing();
     }
@@ -1009,6 +1019,13 @@ class EditorController {
                 // Add drag handle if multiple instances
                 if (templateInfo.instanceCount > 1) {
                     this.addInstanceDragHandle(instanceElement);
+                }
+                // Add click handler for instance selection (mobile controls visibility)
+                if (!instanceElement.dataset.scmsInstanceClickHandler) {
+                    instanceElement.addEventListener("click", () => {
+                        this.selectInstance(instanceElement);
+                    });
+                    instanceElement.dataset.scmsInstanceClickHandler = "true";
                 }
             });
 
@@ -1267,9 +1284,20 @@ class EditorController {
                 background: rgba(0, 0, 0, 0.6);
             }
 
-            [data-scms-instance]:hover > .scms-instance-delete {
-                opacity: 1;
-                pointer-events: auto;
+            /* Desktop: show on hover */
+            @media (hover: hover) {
+                [data-scms-instance]:hover > .scms-instance-delete {
+                    opacity: 1;
+                    pointer-events: auto;
+                }
+            }
+
+            /* Touch devices: show when instance is selected */
+            @media (hover: none) {
+                [data-scms-instance].scms-instance-selected > .scms-instance-delete {
+                    opacity: 1;
+                    pointer-events: auto;
+                }
             }
 
             /* Template structure mismatch indicator */
@@ -1353,8 +1381,18 @@ class EditorController {
                 cursor: grabbing;
             }
 
-            [data-scms-instance]:hover > .scms-instance-drag-handle {
-                opacity: 1;
+            /* Desktop: show on hover */
+            @media (hover: hover) {
+                [data-scms-instance]:hover > .scms-instance-drag-handle {
+                    opacity: 1;
+                }
+            }
+
+            /* Touch devices: show when instance is selected */
+            @media (hover: none) {
+                [data-scms-instance].scms-instance-selected > .scms-instance-drag-handle {
+                    opacity: 1;
+                }
             }
 
             .scms-instance-drag-handle svg {
@@ -1414,6 +1452,12 @@ class EditorController {
 
         this.selectedKey = key;
 
+        // Also select parent instance if element is inside one
+        const parentInstance = primaryInfo.element.closest("[data-scms-instance]") as HTMLElement | null;
+        if (parentInstance) {
+            this.selectInstance(parentInstance);
+        }
+
         // Add selection classes
         for (const info of infos) {
             const isPrimary = info.element === primaryInfo.element;
@@ -1455,6 +1499,31 @@ class EditorController {
             this.toolbar.activeElement = null;
             this.toolbar.activeElementType = null;
         }
+    }
+
+    /**
+     * Select a template instance (for mobile controls visibility).
+     */
+    private selectInstance(instanceElement: HTMLElement): void {
+        if (this.selectedInstance === instanceElement) return;
+
+        // Deselect previous instance
+        if (this.selectedInstance) {
+            this.selectedInstance.classList.remove("scms-instance-selected");
+        }
+
+        this.selectedInstance = instanceElement;
+        instanceElement.classList.add("scms-instance-selected");
+    }
+
+    /**
+     * Deselect the currently selected template instance.
+     */
+    private deselectInstance(): void {
+        if (!this.selectedInstance) return;
+
+        this.selectedInstance.classList.remove("scms-instance-selected");
+        this.selectedInstance = null;
     }
 
     private startEditing(key: string, clickedElement?: HTMLElement): void {
@@ -3135,6 +3204,11 @@ class EditorController {
             if (hasInlineControls && !this.sortableInstances.has(templateId)) {
                 this.initializeSortable(templateId, container);
             }
+        }
+
+        // Select the new instance (for mobile controls visibility)
+        if (!this.isInstanceAlsoEditable(clone)) {
+            this.selectInstance(clone);
         }
 
         // Mark as having unsaved changes (order array will be saved with other changes)
