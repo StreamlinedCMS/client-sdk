@@ -88,6 +88,7 @@ export default defineConfig({
             include: ["src/**/*.ts"],
             exclude: [
                 "src/types.ts",
+                "src/loader.ts", // Separate IIFE build, tested indirectly via script tag
             ],
             thresholds: {
                 lines: 80,

@@ -69,3 +69,32 @@ export async function clearInvalidApiKeys(): Promise<void> {
         throw new Error(`Failed to clear invalid API keys: ${response.statusText}`);
     }
 }
+
+/**
+ * Set the next PATCH /content error on the test server.
+ * The error will be returned once and then cleared.
+ * @param status - HTTP status code (e.g., 401, 403, 500)
+ * @param message - Error message to include in response
+ */
+export async function setNextPatchError(status: number, message: string): Promise<void> {
+    const response = await fetch(`${serverUrl}/test/patch-error`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status, message }),
+    });
+    if (!response.ok) {
+        throw new Error(`Failed to set patch error: ${response.statusText}`);
+    }
+}
+
+/**
+ * Clear the next PATCH error on the test server.
+ */
+export async function clearNextPatchError(): Promise<void> {
+    const response = await fetch(`${serverUrl}/test/patch-error`, {
+        method: "DELETE",
+    });
+    if (!response.ok) {
+        throw new Error(`Failed to clear patch error: ${response.statusText}`);
+    }
+}

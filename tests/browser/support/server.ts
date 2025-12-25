@@ -21,6 +21,8 @@ export class TestServer {
     private contentStore: Map<string, ContentElement> = new Map();
     // Set of API keys that should be rejected with 401
     private invalidApiKeys: Set<string> = new Set();
+    // Next error to return for PATCH /content (for testing error handling)
+    private nextPatchError: { status: number; message: string } | null = null;
 
     constructor(private preferredPort?: number) {
         // If preferredPort is specified, we'll use it; otherwise use getPort()
@@ -38,6 +40,21 @@ export class TestServer {
      */
     clearInvalidApiKeys(): void {
         this.invalidApiKeys.clear();
+    }
+
+    /**
+     * Set the next error to return for PATCH /content
+     * The error will be returned once and then cleared
+     */
+    setNextPatchError(status: number, message: string): void {
+        this.nextPatchError = { status, message };
+    }
+
+    /**
+     * Clear the next patch error
+     */
+    clearNextPatchError(): void {
+        this.nextPatchError = null;
     }
 
     /**
@@ -146,6 +163,24 @@ export class TestServer {
             return true;
         }
 
+        // POST /test/patch-error - Set next PATCH error
+        if (pathname === "/test/patch-error" && req.method === "POST") {
+            const body = await this.readBody(req);
+            const { status, message } = JSON.parse(body);
+            this.setNextPatchError(status, message);
+            res.writeHead(200, { ...corsHeaders, "Content-Type": "application/json" });
+            res.end(JSON.stringify({ success: true }));
+            return true;
+        }
+
+        // DELETE /test/patch-error - Clear next PATCH error
+        if (pathname === "/test/patch-error" && req.method === "DELETE") {
+            this.clearNextPatchError();
+            res.writeHead(200, { ...corsHeaders, "Content-Type": "application/json" });
+            res.end(JSON.stringify({ success: true }));
+            return true;
+        }
+
         return false;
     }
 
@@ -223,6 +258,18 @@ export class TestServer {
 
             // PATCH request - batch update
             if (req.method === "PATCH") {
+                // Check if we should return a simulated error
+                if (this.nextPatchError) {
+                    const error = this.nextPatchError;
+                    this.nextPatchError = null; // Clear after use
+                    res.writeHead(error.status, {
+                        "Content-Type": "application/json",
+                        "Access-Control-Allow-Origin": "*",
+                    });
+                    res.end(JSON.stringify({ error: error.message }));
+                    return true;
+                }
+
                 const body = await this.readBody(req);
                 const data = JSON.parse(body) as {
                     elements?: Record<string, { content: string } | null>;
