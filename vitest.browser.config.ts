@@ -70,12 +70,16 @@ export default defineConfig({
         include: ["tests/browser/**/*.browser.test.ts"],
         globals: true,
         globalSetup: ["./tests/browser/support/globalSetup.ts"],
+        testTimeout: 10000, // 10 second max per test
+        fileParallelism: false, // Run files sequentially to avoid shared API state conflicts
         browser: {
             enabled: true,
             provider: playwright(),
             headless: true,
             instances: [{ browser: "chromium" }],
             testerHtmlPath: "./tests/browser/support/fixtures/tester.html",
+            // Use desktop viewport to avoid mobile two-click editing behavior
+            viewport: { width: 1280, height: 720 },
         },
         coverage: {
             provider: "v8",

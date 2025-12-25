@@ -1,6 +1,7 @@
 import { createServer, Server, IncomingMessage, ServerResponse } from "http";
 import { readFile } from "fs/promises";
 import { join, extname } from "path";
+import type { Socket } from "net";
 import getPort from "get-port";
 
 interface ContentElement {
@@ -15,6 +16,7 @@ interface ContentElement {
 export class TestServer {
     private server: Server | null = null;
     private port: number | null = null;
+    private connections: Set<Socket> = new Set();
     // In-memory storage for content during tests
     private contentStore: Map<string, ContentElement> = new Map();
     // Set of API keys that should be rejected with 401
@@ -508,6 +510,14 @@ export class TestServer {
                 }
             });
 
+            // Track connections so we can force-close them on stop
+            this.server.on("connection", (socket: Socket) => {
+                this.connections.add(socket);
+                socket.on("close", () => {
+                    this.connections.delete(socket);
+                });
+            });
+
             this.server.listen(this.port, () => {
                 resolve();
             });
@@ -519,6 +529,12 @@ export class TestServer {
     async stop(): Promise<void> {
         return new Promise((resolve, reject) => {
             if (this.server) {
+                // Force close all existing connections
+                for (const socket of this.connections) {
+                    socket.destroy();
+                }
+                this.connections.clear();
+
                 this.server.close((err) => {
                     if (err) {
                         reject(err);
