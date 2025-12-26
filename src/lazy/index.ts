@@ -15,8 +15,6 @@ import { KeyStorage, type EditorMode } from "../key-storage.js";
 import { PopupManager, type MediaFile } from "../popup-manager.js";
 import type {
     EditableType,
-    ContentData,
-    TextContentData,
     HtmlContentData,
     ImageContentData,
     LinkContentData,
@@ -247,6 +245,7 @@ import {
     type TemplateInfo,
 } from "./state.js";
 import { DraftManager } from "./draft-manager.js";
+import { ContentManager } from "./content-manager.js";
 
 // Toolbar height constants
 const TOOLBAR_HEIGHT_DESKTOP = 48;
@@ -273,6 +272,7 @@ class EditorController {
     private popupManager: PopupManager;
     private state: EditorState;
     private draftManager: DraftManager;
+    private contentManager: ContentManager;
     // Reverse lookup: element -> key (for click handling) - WeakMap can't be reactive
     private elementToKey: WeakMap<HTMLElement, string> = new WeakMap();
     // Track instance delete buttons - WeakMap can't be reactive
@@ -303,9 +303,15 @@ class EditorController {
         // Initialize reactive state
         this.state = createEditorState();
 
+        // Initialize content manager
+        this.contentManager = new ContentManager(this.state, {
+            getEditableType: this.getEditableType.bind(this),
+            applyAttributesToElement: this.applyAttributesToElement.bind(this),
+        });
+
         // Initialize draft manager
         this.draftManager = new DraftManager(this.state, this.log, this._draftStorageKey, {
-            syncAllElementsFromContent: this.syncAllElementsFromContent.bind(this),
+            syncAllElementsFromContent: (key) => this.contentManager.syncAllElementsFromContent(key),
             getEditableInfo: this.getEditableInfo.bind(this),
             getStorageContext: this.getStorageContext.bind(this),
             buildStorageKey: this.buildStorageKey.bind(this),
@@ -558,7 +564,7 @@ class EditorController {
                     // Sync the new element with existing content (e.g., group inside template)
                     const content = this.state.currentContent.get(key);
                     if (content) {
-                        this.applyElementContent(key, elementInfo, content);
+                        this.contentManager.applyElementContent(key, elementInfo, content);
                     }
                 } else {
                     this.state.editableElements.set(key, [elementInfo]);
@@ -574,7 +580,7 @@ class EditorController {
                         this.normalizeDomWhitespace(elementInfo.element, info.type);
                     }
 
-                    const content = this.getElementContent(key, elementInfo);
+                    const content = this.contentManager.getElementContent(key, elementInfo);
                     this.state.originalContent.set(key, content);
                     this.state.currentContent.set(key, content);
                 }
@@ -1708,7 +1714,7 @@ class EditorController {
             ) {
                 info.element.addEventListener("input", () => {
                     // Update currentContent from DOM, then sync all elements
-                    this.updateContentFromElement(key, info.element);
+                    this.contentManager.updateContentFromElement(key, info.element);
                     this.updateToolbarHasChanges();
                 });
                 info.element.dataset.scmsInputHandler = "true";
@@ -1778,52 +1784,6 @@ class EditorController {
         }
     }
 
-    /**
-     * Update currentContent from a DOM element, then sync all DOM elements for that key.
-     * This is the authoritative flow: DOM edit -> currentContent -> sync all DOM elements.
-     */
-    private updateContentFromElement(key: string, sourceElement: HTMLElement): void {
-        const infos = this.state.editableElements.get(key);
-        if (!infos || infos.length === 0) return;
-
-        // Find the info for the source element to get proper content
-        const sourceInfo = infos.find((i) => i.element === sourceElement);
-        if (!sourceInfo) return;
-
-        // Update currentContent from the source element
-        const content = this.getElementContent(key, sourceInfo);
-        this.state.currentContent.set(key, content);
-
-        // Sync all other DOM elements from currentContent
-        this.syncAllElementsFromContent(key, sourceElement);
-    }
-
-    /**
-     * Sync all DOM elements for a key from currentContent.
-     * Optionally skip a source element (to avoid overwriting what user just typed).
-     */
-    private syncAllElementsFromContent(key: string, skipElement?: HTMLElement): void {
-        const infos = this.state.editableElements.get(key);
-        if (!infos) return;
-
-        const content = this.state.currentContent.get(key);
-        if (content === undefined) return;
-
-        for (const info of infos) {
-            if (skipElement && info.element === skipElement) continue;
-            this.applyElementContent(key, info, content);
-        }
-    }
-
-    /**
-     * Update currentContent directly (for modal-based edits like image/link).
-     * Then sync all DOM elements.
-     */
-    private setContent(key: string, content: string): void {
-        this.state.currentContent.set(key, content);
-        this.syncAllElementsFromContent(key);
-    }
-
     private stopEditing(): void {
         if (!this.state.editingKey) {
             return;
@@ -1851,183 +1811,11 @@ class EditorController {
     }
 
     /**
-     * Get the current content value for an element based on its type.
-     * Returns JSON string with type field for all element types.
-     * Includes attributes if any have been set.
-     * Note: DOM whitespace should be normalized before calling this (via normalizeDomWhitespace).
-     */
-    private getElementContent(key: string, info: EditableElementInfo): string {
-        const elementType = this.getEditableType(key);
-        const attributes = this.state.elementAttributes.get(key);
-
-        if (elementType === "image" && info.element instanceof HTMLImageElement) {
-            const data: ImageContentData = {
-                type: "image",
-                src: info.element.src,
-                ...(attributes && Object.keys(attributes).length > 0 ? { attributes } : {}),
-            };
-            return JSON.stringify(data);
-        } else if (elementType === "link" && info.element instanceof HTMLAnchorElement) {
-            const data: LinkContentData = {
-                type: "link",
-                href: info.element.href,
-                target: info.element.target,
-                value: info.element.innerHTML,
-                ...(attributes && Object.keys(attributes).length > 0 ? { attributes } : {}),
-            };
-            return JSON.stringify(data);
-        } else if (elementType === "text") {
-            const data: TextContentData = {
-                type: "text",
-                value: info.element.textContent || "",
-                ...(attributes && Object.keys(attributes).length > 0 ? { attributes } : {}),
-            };
-            return JSON.stringify(data);
-        } else {
-            // html (default)
-            const data: HtmlContentData = {
-                type: "html",
-                value: info.element.innerHTML,
-                ...(attributes && Object.keys(attributes).length > 0 ? { attributes } : {}),
-            };
-            return JSON.stringify(data);
-        }
-    }
-
-    /**
-     * Apply content to an element based on stored type
-     * Also extracts and applies attributes if present
-     */
-    private applyElementContent(key: string, info: EditableElementInfo, content: string): void {
-        const elementType = this.getEditableType(key);
-
-        try {
-            const data = JSON.parse(content) as
-                | (ContentData & { attributes?: ElementAttributes })
-                | { type?: undefined; attributes?: ElementAttributes };
-
-            // Extract and store attributes if present
-            if (data.attributes && Object.keys(data.attributes).length > 0) {
-                this.state.elementAttributes.set(key, data.attributes);
-                this.applyAttributesToElement(info.element, data.attributes);
-            }
-
-            if (data.type === "text") {
-                info.element.textContent = (data as TextContentData).value;
-            } else if (data.type === "html") {
-                info.element.innerHTML = (data as HtmlContentData).value;
-            } else if (data.type === "image" && info.element instanceof HTMLImageElement) {
-                info.element.src = (data as ImageContentData).src;
-            } else if (data.type === "link" && info.element instanceof HTMLAnchorElement) {
-                const linkData = data as LinkContentData;
-                info.element.href = linkData.href;
-                info.element.target = linkData.target;
-                info.element.innerHTML = linkData.value;
-            } else if (!data.type) {
-                // No type field in JSON - use element's declared type
-                if (elementType === "link" && info.element instanceof HTMLAnchorElement) {
-                    const linkData = data as { href?: string; target?: string; value?: string };
-                    if (linkData.href !== undefined) {
-                        info.element.href = linkData.href;
-                        info.element.target = linkData.target || "";
-                        info.element.innerHTML = linkData.value || "";
-                        return;
-                    }
-                } else if (elementType === "image" && info.element instanceof HTMLImageElement) {
-                    const imageData = data as { src?: string };
-                    if (imageData.src !== undefined) {
-                        info.element.src = imageData.src;
-                        return;
-                    }
-                } else if (elementType === "text") {
-                    const textData = data as { value?: string };
-                    if (textData.value !== undefined) {
-                        info.element.textContent = textData.value;
-                        return;
-                    }
-                } else if (elementType === "html") {
-                    const htmlData = data as { value?: string };
-                    if (htmlData.value !== undefined) {
-                        info.element.innerHTML = htmlData.value;
-                        return;
-                    }
-                }
-            }
-        } catch {
-            // Not JSON - ignore, content should always be JSON
-        }
-    }
-
-    private getDirtyElements(): Map<string, { content: string; info: EditableElementInfo }> {
-        const dirty = new Map<string, { content: string; info: EditableElementInfo }>();
-        // Compare currentContent vs originalContent (not DOM)
-        this.state.currentContent.forEach((current, key) => {
-            const original = this.state.originalContent.get(key);
-            if (original !== undefined && current !== original) {
-                // Get info for the key (need it for save metadata)
-                const infos = this.state.editableElements.get(key);
-                const info = infos?.[0];
-                if (info) {
-                    dirty.set(key, { content: current, info });
-                }
-            }
-        });
-        return dirty;
-    }
-
-    /**
-     * Get template elements that have never been saved to the API.
-     * These are elements derived from HTML that need to be persisted when
-     * the template order changes (e.g., when adding a new item to a list
-     * that already had HTML-defined items).
-     *
-     * Only returns elements for templates that have order changes, since
-     * that's when we need to ensure all items are persisted.
-     */
-    private getUnsavedTemplateElements(
-        templatesWithOrderChanges: string[],
-    ): Map<string, { content: string; info: EditableElementInfo }> {
-        const unsaved = new Map<string, { content: string; info: EditableElementInfo }>();
-
-        // Build a set of template IDs with order changes for fast lookup
-        const changedTemplates = new Set(templatesWithOrderChanges);
-        if (changedTemplates.size === 0) {
-            return unsaved;
-        }
-
-        // Check each editable element
-        this.state.editableElements.forEach((infos, key) => {
-            const info = infos[0];
-            if (!info || !info.templateId || !info.instanceId) {
-                return; // Not a template element
-            }
-
-            // Only include elements from templates with order changes
-            if (!changedTemplates.has(info.templateId)) {
-                return;
-            }
-
-            // Skip if already saved to API
-            if (this.state.savedContentKeys.has(key)) {
-                return;
-            }
-
-            // Get the current content
-            const content = this.state.currentContent.get(key);
-            if (content !== undefined) {
-                unsaved.set(key, { content, info });
-            }
-        });
-
-        return unsaved;
-    }
-
-    /**
      * Check if there are any unsaved changes (dirty elements, pending deletes, or order changes)
      */
     private hasUnsavedChanges(): boolean {
         return (
-            this.getDirtyElements().size > 0 ||
+            this.contentManager.getDirtyElements().size > 0 ||
             this.draftManager.getPendingDeletes().length > 0 ||
             this.getTemplatesWithOrderChanges().length > 0
         );
@@ -2041,14 +1829,14 @@ class EditorController {
     }
 
     private async handleSave(): Promise<void> {
-        const dirtyElements = this.getDirtyElements();
+        const dirtyElements = this.contentManager.getDirtyElements();
         const pendingDeletes = this.draftManager.getPendingDeletes();
         const templatesWithOrderChanges = this.getTemplatesWithOrderChanges();
         const hasOrderChanges = templatesWithOrderChanges.length > 0;
 
         // Get unsaved template elements (HTML-derived items that need to be persisted
         // when the template order changes)
-        const unsavedTemplateElements = this.getUnsavedTemplateElements(templatesWithOrderChanges);
+        const unsavedTemplateElements = this.contentManager.getUnsavedTemplateElements(templatesWithOrderChanges);
 
         if (dirtyElements.size === 0 && pendingDeletes.length === 0 && !hasOrderChanges) {
             return;
@@ -2295,7 +2083,7 @@ class EditorController {
             this.log.debug("Resetting element", { key, elementType });
             // Restore currentContent from originalContent, then sync DOM
             this.state.currentContent.set(key, originalContent);
-            this.syncAllElementsFromContent(key);
+            this.contentManager.syncAllElementsFromContent(key);
             this.updateToolbarHasChanges();
         }
     }
@@ -2328,7 +2116,7 @@ class EditorController {
                 ...(attributes && Object.keys(attributes).length > 0 ? { attributes } : {}),
             };
             // Update via setContent - this updates currentContent and syncs all DOM elements
-            this.setContent(key, JSON.stringify(data));
+            this.contentManager.setContent(key, JSON.stringify(data));
             this.updateToolbarHasChanges();
             this.log.debug("Image changed", {
                 key,
@@ -2392,7 +2180,7 @@ class EditorController {
                 value: e.detail.content,
                 ...(attributes && Object.keys(attributes).length > 0 ? { attributes } : {}),
             };
-            this.setContent(key, JSON.stringify(data));
+            this.contentManager.setContent(key, JSON.stringify(data));
             this.closeHtmlEditor();
             this.updateToolbarHasChanges();
             this.log.debug("HTML applied", {
@@ -2464,7 +2252,7 @@ class EditorController {
                 value: e.detail.linkData.value,
                 ...(attributes && Object.keys(attributes).length > 0 ? { attributes } : {}),
             };
-            this.setContent(key, JSON.stringify(data));
+            this.contentManager.setContent(key, JSON.stringify(data));
             this.closeLinkEditor();
             this.updateToolbarHasChanges();
             this.log.debug("Link updated", {
@@ -3254,10 +3042,10 @@ class EditorController {
                 let content = this.state.currentContent.get(key);
                 if (!content && existing.length > 0) {
                     // No saved content yet - get content from an existing element
-                    content = this.getElementContent(key, existing[0]);
+                    content = this.contentManager.getElementContent(key, existing[0]);
                 }
                 if (content) {
-                    this.applyElementContent(key, elementInfo, content);
+                    this.contentManager.applyElementContent(key, elementInfo, content);
                 }
             } else {
                 this.state.editableElements.set(key, [elementInfo]);
@@ -3269,7 +3057,7 @@ class EditorController {
                 // For new instance elements, normalize whitespace (no saved content exists yet)
                 this.normalizeDomWhitespace(element, info.type);
 
-                const content = this.getElementContent(key, elementInfo);
+                const content = this.contentManager.getElementContent(key, elementInfo);
                 this.state.originalContent.set(key, content);
                 this.state.currentContent.set(key, content);
             }
