@@ -25,7 +25,8 @@
     const apiUrl = loaderScript.dataset.apiUrl || __SDK_API_URL__;
 
     // Inject preconnect hint immediately to start TLS handshake early
-    const apiOrigin = new URL(apiUrl).origin;
+    // Use window.location.origin as base to support relative URLs (e.g., "/v1" in tests)
+    const apiOrigin = new URL(apiUrl, window.location.origin).origin;
     const preconnect = document.createElement("link");
     preconnect.rel = "preconnect";
     preconnect.href = apiOrigin;
@@ -756,7 +757,13 @@
         removeHidingStyles();
 
         // Now load lazy module for auth/editing features
-        injectEsmModule();
+        // (skip if data-skip-esm is set, for testing with source imports)
+        if (!loaderScript.dataset.skipEsm) {
+            injectEsmModule();
+        }
+
+        // Dispatch event to signal loader is complete (useful for tests)
+        document.dispatchEvent(new CustomEvent("streamlined-cms:loader-complete"));
     }
 
     // Start initialization

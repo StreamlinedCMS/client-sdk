@@ -2,3 +2,5 @@ dist
 .env*
 .wrangler
 node_modules
+__screenshots__
+.test-server-port

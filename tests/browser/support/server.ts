@@ -1,11 +1,69 @@
 import { createServer, Server, IncomingMessage, ServerResponse } from "http";
 import { readFile } from "fs/promises";
 import { join, extname } from "path";
+import type { Socket } from "net";
 import getPort from "get-port";
 
 interface ContentElement {
     content: string;
     updatedAt: string;
+}
+
+interface TriggerError {
+    status: number;
+    message: string;
+}
+
+/**
+ * Error triggers that can be embedded in content to simulate server errors.
+ * When the server sees content containing these strings, it returns the corresponding error.
+ */
+const ERROR_TRIGGERS: Record<string, TriggerError> = {
+    "__TRIGGER_500__": { status: 500, message: "Internal Server Error" },
+    "__TRIGGER_401__": { status: 401, message: "Unauthorized" },
+    "__TRIGGER_403__": { status: 403, message: "Forbidden" },
+    "__TRIGGER_404__": { status: 404, message: "Not Found" },
+    "__TRIGGER_429__": { status: 429, message: "Too Many Requests" },
+};
+
+/**
+ * Check if a string contains an error trigger and return the corresponding error.
+ * This function can be used by any endpoint to check for triggers in request content.
+ * @param content - The content string to check
+ * @returns The error to return, or null if no trigger found
+ */
+function checkForErrorTrigger(content: string): TriggerError | null {
+    for (const [trigger, error] of Object.entries(ERROR_TRIGGERS)) {
+        if (content.includes(trigger)) {
+            return error;
+        }
+    }
+    return null;
+}
+
+/**
+ * Check if any value in an object (recursively) contains an error trigger.
+ * Useful for checking request bodies with nested content.
+ * @param obj - The object to search
+ * @returns The error to return, or null if no trigger found
+ */
+function checkObjectForErrorTrigger(obj: unknown): TriggerError | null {
+    if (typeof obj === "string") {
+        return checkForErrorTrigger(obj);
+    }
+    if (Array.isArray(obj)) {
+        for (const item of obj) {
+            const error = checkObjectForErrorTrigger(item);
+            if (error) return error;
+        }
+    }
+    if (obj && typeof obj === "object") {
+        for (const value of Object.values(obj)) {
+            const error = checkObjectForErrorTrigger(value);
+            if (error) return error;
+        }
+    }
+    return null;
 }
 
 /**
@@ -15,13 +73,14 @@ interface ContentElement {
 export class TestServer {
     private server: Server | null = null;
     private port: number | null = null;
+    private connections: Set<Socket> = new Set();
     // In-memory storage for content during tests
     private contentStore: Map<string, ContentElement> = new Map();
     // Set of API keys that should be rejected with 401
     private invalidApiKeys: Set<string> = new Set();
 
-    constructor(_preferredPort?: number) {
-        // Preferred port is ignored - we always use getPort()
+    constructor(private preferredPort?: number) {
+        // If preferredPort is specified, we'll use it; otherwise use getPort()
     }
 
     /**
@@ -77,6 +136,74 @@ export class TestServer {
      */
     clearContent(): void {
         this.contentStore.clear();
+    }
+
+    /**
+     * Handle test configuration endpoints (for browser-based tests)
+     * These endpoints allow tests running in the browser to configure the server
+     */
+    private async handleTestRequest(
+        req: IncomingMessage,
+        res: ServerResponse,
+        pathname: string,
+    ): Promise<boolean> {
+        const corsHeaders = {
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type",
+        };
+
+        // Handle CORS preflight
+        if (req.method === "OPTIONS") {
+            res.writeHead(204, corsHeaders);
+            res.end();
+            return true;
+        }
+
+        // GET /test/config - Get server configuration (for browser tests to discover URL)
+        if (pathname === "/test/config" && req.method === "GET") {
+            res.writeHead(200, { ...corsHeaders, "Content-Type": "application/json" });
+            res.end(JSON.stringify({ url: `http://localhost:${this.port}` }));
+            return true;
+        }
+
+        // POST /test/content - Set content for an element
+        if (pathname === "/test/content" && req.method === "POST") {
+            const body = await this.readBody(req);
+            const { appId, elementId, content } = JSON.parse(body);
+            this.setContent(appId, elementId, content);
+            res.writeHead(200, { ...corsHeaders, "Content-Type": "application/json" });
+            res.end(JSON.stringify({ success: true }));
+            return true;
+        }
+
+        // DELETE /test/content - Clear all content
+        if (pathname === "/test/content" && req.method === "DELETE") {
+            this.clearContent();
+            res.writeHead(200, { ...corsHeaders, "Content-Type": "application/json" });
+            res.end(JSON.stringify({ success: true }));
+            return true;
+        }
+
+        // POST /test/invalid-api-key - Mark an API key as invalid
+        if (pathname === "/test/invalid-api-key" && req.method === "POST") {
+            const body = await this.readBody(req);
+            const { apiKey } = JSON.parse(body);
+            this.setInvalidApiKey(apiKey);
+            res.writeHead(200, { ...corsHeaders, "Content-Type": "application/json" });
+            res.end(JSON.stringify({ success: true }));
+            return true;
+        }
+
+        // DELETE /test/invalid-api-keys - Clear all invalid API keys
+        if (pathname === "/test/invalid-api-keys" && req.method === "DELETE") {
+            this.clearInvalidApiKeys();
+            res.writeHead(200, { ...corsHeaders, "Content-Type": "application/json" });
+            res.end(JSON.stringify({ success: true }));
+            return true;
+        }
+
+        return false;
     }
 
     private async handleApiRequest(
@@ -158,6 +285,17 @@ export class TestServer {
                     elements?: Record<string, { content: string } | null>;
                     groups?: Record<string, { elements: Record<string, { content: string } | null> }>;
                 };
+
+                // Check for error triggers in the request content
+                const triggerError = checkObjectForErrorTrigger(data);
+                if (triggerError) {
+                    res.writeHead(triggerError.status, {
+                        "Content-Type": "application/json",
+                        "Access-Control-Allow-Origin": "*",
+                    });
+                    res.end(JSON.stringify({ error: triggerError.message }));
+                    return true;
+                }
 
                 const responseElements: Record<string, ContentElement> = {};
                 const responseGroups: Record<string, { elements: Record<string, ContentElement> }> = {};
@@ -360,8 +498,8 @@ export class TestServer {
     }
 
     async start(): Promise<void> {
-        // Find any available port
-        this.port = await getPort();
+        // Use preferred port if specified, otherwise find any available port
+        this.port = this.preferredPort ?? await getPort();
 
         return new Promise((resolve, reject) => {
             this.server = createServer(async (req, res) => {
@@ -369,7 +507,13 @@ export class TestServer {
                     const url = new URL(req.url || "/", `http://localhost:${this.port}`);
                     const pathname = url.pathname;
 
-                    // Handle API requests first (strip /v1 prefix like the real worker)
+                    // Handle test configuration endpoints (for browser-based tests)
+                    if (pathname.startsWith("/test/")) {
+                        const handled = await this.handleTestRequest(req, res, pathname);
+                        if (handled) return;
+                    }
+
+                    // Handle API requests (strip /v1 prefix like the real worker)
                     if (pathname.startsWith("/v1/")) {
                         const strippedPath = pathname.slice(3); // Remove "/v1"
                         const handled = await this.handleApiRequest(req, res, strippedPath);
@@ -386,7 +530,7 @@ export class TestServer {
                     else if (pathname === "/" || pathname === "/index.html") {
                         const htmlPath = join(
                             process.cwd(),
-                            "tests/browser/fixtures/test-page.html",
+                            "tests/browser/support/fixtures/test-page.html",
                         );
                         let html = await readFile(htmlPath, "utf-8");
                         // Replace template placeholder with actual API URL
@@ -399,7 +543,7 @@ export class TestServer {
                     else if (pathname === "/auth-test.html") {
                         const htmlPath = join(
                             process.cwd(),
-                            "tests/browser/fixtures/test-page-no-mock-auth.html",
+                            "tests/browser/support/fixtures/test-page-no-mock-auth.html",
                         );
                         let html = await readFile(htmlPath, "utf-8");
                         html = html.replace("{{API_URL}}", `http://localhost:${this.port}/v1`);
@@ -434,6 +578,14 @@ export class TestServer {
                 }
             });
 
+            // Track connections so we can force-close them on stop
+            this.server.on("connection", (socket: Socket) => {
+                this.connections.add(socket);
+                socket.on("close", () => {
+                    this.connections.delete(socket);
+                });
+            });
+
             this.server.listen(this.port, () => {
                 resolve();
             });
@@ -445,6 +597,12 @@ export class TestServer {
     async stop(): Promise<void> {
         return new Promise((resolve, reject) => {
             if (this.server) {
+                // Force close all existing connections
+                for (const socket of this.connections) {
+                    socket.destroy();
+                }
+                this.connections.clear();
+
                 this.server.close((err) => {
                     if (err) {
                         reject(err);
