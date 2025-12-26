@@ -27,5 +27,8 @@ jobs:
           echo "SDK_API_URL=https://api.example.com/v1" >> .env
           echo "SDK_APP_URL=https://app.example.com" >> .env
 
+      - name: Build
+        run: npm run build
+
       - name: Run tests
         run: npm test
