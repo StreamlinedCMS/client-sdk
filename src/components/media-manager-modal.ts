@@ -169,17 +169,36 @@ export class MediaManagerModal extends LitElement {
                 top: 50%;
                 left: 50%;
                 transform: translate(-50%, -50%);
-                text-align: center;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
             }
 
             .status-text {
                 color: #6b7280;
                 font-size: 14px;
+                margin-top: 50px;
             }
 
             .status-error {
                 color: #dc2626;
                 font-size: 14px;
+            }
+
+            .spinner {
+                width: 24px;
+                height: 24px;
+                border: 2px solid #e5e7eb;
+                border-top-color: #6366f1;
+                border-radius: 50%;
+                animation: spin 0.8s linear infinite;
+            }
+
+            @keyframes spin {
+                to {
+                    transform: rotate(360deg);
+                }
             }
         `,
     ];
@@ -296,21 +315,45 @@ export class MediaManagerModal extends LitElement {
     }
 
     /**
+     * Wait for the connection to be ready and authenticated.
+     * Returns true if ready, false if an error occurred.
+     */
+    private waitForReady(): Promise<boolean> {
+        return new Promise((resolve) => {
+            const check = () => {
+                if (this.error) {
+                    resolve(false);
+                    return;
+                }
+                if (this.mediaManager && this.authenticated) {
+                    resolve(true);
+                    return;
+                }
+                // Check again on next frame
+                requestAnimationFrame(check);
+            };
+            check();
+        });
+    }
+
+    /**
      * Open the modal and wait for user selection.
      * Returns the selected MediaFile or null if cancelled or error.
      */
     async selectMedia(options?: SelectFileOptions): Promise<MediaFile | null> {
         this.open = true;
 
-        // If not ready, wait for user to close the modal (they'll see the error)
-        if (!this.mediaManager || !this.authenticated) {
+        // Wait for connection and authentication
+        const ready = await this.waitForReady();
+        if (!ready) {
+            // Error occurred, wait for user to close modal
             return new Promise((resolve) => {
                 this.pendingResolve = () => resolve(null);
             });
         }
 
         try {
-            const result = await this.mediaManager.selectFile(options);
+            const result = await this.mediaManager!.selectFile(options);
 
             this.open = false;
 
@@ -414,7 +457,7 @@ export class MediaManagerModal extends LitElement {
                 </div>
                 <div class="iframe-container">
                     ${statusMessage
-                        ? html`<div class="status"><span class="status-text">${statusMessage}</span></div>`
+                        ? html`<div class="status"><div class="spinner"></div><span class="status-text">${statusMessage}</span></div>`
                         : null}
                     ${this.error
                         ? html`<div class="status"><span class="status-error">${this.error}</span></div>`
