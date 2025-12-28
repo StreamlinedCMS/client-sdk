@@ -251,7 +251,7 @@ export class MediaManagerModal extends LitElement {
         if (!this.appUrl || !this.appId) return;
         if (this.iframe) return; // Already initialized
 
-        const url = `${this.appUrl}/media?appId=${encodeURIComponent(this.appId)}&mode=iframe`;
+        const url = `${this.appUrl}/embed/media?appId=${encodeURIComponent(this.appId)}`;
         const origin = new URL(this.appUrl).origin;
 
         // Create iframe
