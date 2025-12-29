@@ -13,6 +13,7 @@ import { customElement, property, state } from "lit/decorators.js";
 import { WindowMessenger, connect } from "penpal";
 import { tailwindSheet } from "./styles.js";
 import type { MediaFile } from "../popup-manager.js";
+import { IMAGE_PLACEHOLDER_DATA_URI } from "../types.js";
 
 // Re-export MediaFile for consumers
 export type { MediaFile } from "../popup-manager.js";
@@ -50,11 +51,18 @@ interface CancelRequestResult {
     error?: string;
 }
 
+/** Result from uploadFile call */
+interface UploadFileResult {
+    file?: MediaFile;
+    error?: string;
+}
+
 /** Methods exposed by the media manager iframe */
 interface MediaManagerMethods {
     authenticate(apiKey: string): Promise<AuthResult>;
     selectFile(options?: SelectFileOptions): Promise<SelectFileResult>;
     cancelCurrentRequest(): Promise<CancelRequestResult>;
+    uploadFile(candidate: Candidate): Promise<UploadFileResult>;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     [key: string]: (...args: any[]) => Promise<any>;
 }
@@ -425,6 +433,111 @@ export class MediaManagerModal extends LitElement {
             console.error("[MediaManagerModal] selectMedia error:", err);
             return null;
         }
+    }
+
+    /**
+     * Derive a filename for an image candidate.
+     * Priority: URL filename (if it has extension) > title > alt > empty (let server name it)
+     */
+    private deriveFilename(img: HTMLImageElement, contentType: string): string {
+        // Extract extension from content-type, stripping parameters (e.g., "image/svg+xml; charset=utf-8" -> "svg")
+        const mimeSubtype = contentType.split("/")[1]?.split(";")[0] || "jpg";
+        const ext = mimeSubtype.split("+")[0]; // "svg+xml" -> "svg"
+
+        // Try URL path first - only use if it looks like a real filename (has extension)
+        const urlPath = img.src.split("/").pop()?.split("?")[0] || "";
+        if (urlPath.includes(".")) {
+            return urlPath;
+        }
+
+        // Try title attribute
+        if (img.title) {
+            return `${img.title}.${ext}`;
+        }
+
+        // Try alt attribute
+        if (img.alt) {
+            return `${img.alt}.${ext}`;
+        }
+
+        // Let the server generate a name
+        return "";
+    }
+
+    /**
+     * Fetch an image and create a candidate for upload.
+     * Returns null if the image cannot be fetched or is a placeholder.
+     */
+    async fetchImageAsCandidate(img: HTMLImageElement): Promise<Candidate | null> {
+        const src = img.src;
+
+        // Skip our placeholder image
+        if (!src || src === IMAGE_PLACEHOLDER_DATA_URI) {
+            return null;
+        }
+
+        try {
+            const response = await fetch(src);
+            if (!response.ok) {
+                console.debug("[MediaManagerModal] Failed to fetch image for candidate", { src, status: response.status });
+                return null;
+            }
+
+            const data = await response.arrayBuffer();
+            const contentType = response.headers.get("content-type") || "image/jpeg";
+            const filename = this.deriveFilename(img, contentType);
+
+            return { data, filename, contentType };
+        } catch (err) {
+            console.debug("[MediaManagerModal] Error fetching image for candidate", { src, error: err });
+            return null;
+        }
+    }
+
+    /**
+     * Upload all data-scms-image elements to the media library.
+     * This is a utility method for bulk uploading page images.
+     * Returns results for each image attempted.
+     */
+    async uploadAllImages(): Promise<{
+        uploaded: MediaFile[];
+        errors: Array<{ src: string; error: string }>;
+    }> {
+        const uploaded: MediaFile[] = [];
+        const errors: Array<{ src: string; error: string }> = [];
+
+        // Wait for connection and authentication
+        const ready = await this.waitForReady();
+        if (!ready) {
+            return { uploaded, errors: [{ src: "", error: this.error || "Not ready" }] };
+        }
+
+        // Find all data-scms-image elements
+        const images = Array.from(document.querySelectorAll<HTMLImageElement>("img[data-scms-image]"));
+
+        for (const img of images) {
+            const candidate = await this.fetchImageAsCandidate(img);
+            if (!candidate) {
+                // Skip placeholder images or fetch failures (already logged)
+                continue;
+            }
+
+            try {
+                const result = await this.mediaManager!.uploadFile(candidate);
+                if (result.error) {
+                    errors.push({ src: img.src, error: result.error });
+                } else if (result.file) {
+                    uploaded.push(result.file);
+                }
+            } catch (err) {
+                errors.push({
+                    src: img.src,
+                    error: err instanceof Error ? err.message : String(err),
+                });
+            }
+        }
+
+        return { uploaded, errors };
     }
 
     // Pending promise resolver for error state close

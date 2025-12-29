@@ -853,6 +853,21 @@ class EditorController {
     public async openMediaManager(): Promise<MediaFile | null> {
         return this.modalManager.openMediaManager();
     }
+
+    /**
+     * Upload all data-scms-image elements to the media library.
+     * This is a utility method for bulk uploading page images.
+     * Call from console: StreamlinedCMS.uploadAllImages()
+     */
+    public async uploadAllImages(): Promise<{
+        uploaded: MediaFile[];
+        errors: Array<{ src: string; error: string }>;
+    }> {
+        if (!this.state.mediaManagerModal) {
+            return { uploaded: [], errors: [{ src: "", error: "Media manager not initialized" }] };
+        }
+        return this.state.mediaManagerModal.uploadAllImages();
+    }
 }
 
 /**
