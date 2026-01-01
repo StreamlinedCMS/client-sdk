@@ -59,7 +59,7 @@ Get your App ID from [app.streamlinedcms.com](https://app.streamlinedcms.com).
 
 ## Documentation
 
-See [INTEGRATION.md](./INTEGRATION.md) for the complete integration guide, including:
+See [INTEGRATION.md](./docs/INTEGRATION.md) for the complete integration guide, including:
 
 - Script configuration options
 - All editable element types

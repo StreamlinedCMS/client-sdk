@@ -208,4 +208,4 @@ Before submitting a PR:
 
 For bug fixes, include a test that would have caught the bug.
 
-For new features, include tests and update INTEGRATION.md if the feature is user-facing.
+For new features, include tests and update docs/INTEGRATION.md if the feature is user-facing.
