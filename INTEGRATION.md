@@ -1,3 +1,7 @@
+---
+title: Integration Guide
+---
+
 # Integration Guide
 
 This guide explains how to integrate Streamlined CMS into an HTML website to enable inline content editing.
