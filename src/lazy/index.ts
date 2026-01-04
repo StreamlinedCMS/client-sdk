@@ -725,12 +725,14 @@ class EditorController {
 
     private showToolbar(): void {
         const isReadOnly = this.state.permissions?.contentWrite === false;
+        const denyAppGui = this.state.permissions?.denyAppGui === true;
 
         // Update existing toolbar if present
         if (this.state.toolbar) {
             this.state.toolbar.mode = this.state.currentMode;
             this.state.toolbar.activeElement = this.state.editingKey;
             this.state.toolbar.readOnly = isReadOnly;
+            this.state.toolbar.denyAppGui = denyAppGui;
             return;
         }
 
@@ -743,6 +745,7 @@ class EditorController {
         toolbar.appId = this.config.appId;
         toolbar.mockAuth = this.config.mockAuth?.enabled ?? false;
         toolbar.readOnly = isReadOnly;
+        toolbar.denyAppGui = denyAppGui;
 
         toolbar.addEventListener("mode-change", ((e: CustomEvent<{ mode: EditorMode }>) => {
             this.setMode(e.detail.mode);

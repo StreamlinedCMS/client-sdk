@@ -51,6 +51,9 @@ export class Toolbar extends LitElement {
     @property({ type: Boolean, attribute: "read-only" })
     readOnly = false;
 
+    @property({ type: Boolean, attribute: "deny-app-gui" })
+    denyAppGui = false;
+
     // Template context - set when editing an element inside a template
     @property({ type: String, attribute: "template-id" })
     templateId: string | null = null;
@@ -573,6 +576,7 @@ export class Toolbar extends LitElement {
 
     private renderAdminLink() {
         if (this.mockAuth) return nothing;
+        if (this.denyAppGui) return nothing;
         if (!this.appUrl || !this.appId) return nothing;
         const adminUrl = `${this.appUrl}/apps/${encodeURIComponent(this.appId)}`;
         return html`
@@ -638,8 +642,10 @@ export class Toolbar extends LitElement {
                             ? nothing
                             : html`<div class="ml-6 pl-6 border-l border-gray-200 flex items-center">
                                   ${this.renderSignOutButton()}
-                                  <span class="mx-2 text-gray-300">|</span>
-                                  ${this.renderAdminLink()}
+                                  ${this.denyAppGui
+                                      ? nothing
+                                      : html`<span class="mx-2 text-gray-300">|</span>
+                                            ${this.renderAdminLink()}`}
                               </div>`}
                     </div>
                 </div>
@@ -943,7 +949,7 @@ export class Toolbar extends LitElement {
                         Sign Out
                     </button>
                     ${this.renderModeToggle()}
-                    ${this.appUrl && this.appId
+                    ${this.appUrl && this.appId && !this.denyAppGui
                         ? html`
                               <a
                                   href="${this.appUrl}/apps/${encodeURIComponent(this.appId)}"

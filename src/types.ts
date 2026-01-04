@@ -25,6 +25,8 @@ export interface AppPermissions {
     manageMembers: boolean;
     manageBilling: boolean;
     manageSettings: boolean;
+    // Note: may be renamed to `denyAdmin` (see streamlinedcms/api#46)
+    denyAppGui: boolean;
 }
 
 /**
