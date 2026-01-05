@@ -86,21 +86,9 @@ export class ModalManager {
         const modal = document.createElement("scms-media-manager-modal") as MediaManagerModal;
         modal.appUrl = this.config.appUrl;
         modal.appId = this.config.appId;
-        if (this.state.apiKey) {
-            modal.apiKey = this.state.apiKey;
-        }
         document.body.appendChild(modal);
         this.state.mediaManagerModal = modal;
         this.log.debug("Media manager modal initialized");
-    }
-
-    /**
-     * Update media manager API key when it changes
-     */
-    updateMediaManagerApiKey(): void {
-        if (this.state.mediaManagerModal) {
-            this.state.mediaManagerModal.apiKey = this.state.apiKey || "";
-        }
     }
 
     /**

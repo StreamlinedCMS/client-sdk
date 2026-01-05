@@ -82,6 +82,7 @@ import { EditingManager } from "./editing-manager.js";
 import { ModalManager } from "./modal-manager.js";
 import { SaveManager } from "./save-manager.js";
 import { AuthManager } from "./auth-manager.js";
+import { AuthBridge } from "./auth-bridge.js";
 import { injectEditStyles } from "./styles.js";
 import { normalizeWhitespace, normalizeHtmlWhitespace } from "./normalize.js";
 
@@ -108,6 +109,7 @@ class EditorController {
     private log: Logger;
     private keyStorage: KeyStorage;
     private popupManager: PopupManager;
+    private authBridge: AuthBridge;
     private state: EditorState;
     private draftManager: DraftManager;
     private contentManager: ContentManager;
@@ -122,6 +124,8 @@ class EditorController {
     private readonly doubleTapDelay = 400; // ms
     // Spacer element to prevent toolbar from covering content
     private spacerElement: HTMLElement | null = null;
+    // Loading indicator element
+    private loadingIndicator: HTMLElement | null = null;
     // localStorage key for draft persistence (namespaced by app ID by default)
     private _draftStorageKey: string;
 
@@ -205,11 +209,7 @@ class EditorController {
                 apiFetch: this.apiFetch.bind(this),
                 signOut: (skip) => this.authManager.signOut(skip),
                 fetchSavedContentKeys: this.fetchSavedContentKeys.bind(this),
-                refetchPermissions: async () => {
-                    if (this.state.apiKey) {
-                        await this.authManager.fetchPermissions(this.state.apiKey);
-                    }
-                },
+                refetchPermissions: () => this.authManager.refetchPermissions(),
                 disableEditing: this.disableEditing.bind(this),
                 updateToolbarReadOnly: () => {
                     if (this.state.toolbar) {
@@ -226,13 +226,20 @@ class EditorController {
             appUrl: config.appUrl,
         });
 
+        // Initialize auth bridge (hidden iframe for cross-origin auth)
+        this.authBridge = new AuthBridge(
+            { appUrl: config.appUrl, appId: config.appId },
+            this.log,
+        );
+        this.authBridge.init();
+
         // Initialize auth manager
         this.authManager = new AuthManager(
             this.state,
             this.log,
             this.keyStorage,
             this.popupManager,
-            { apiUrl: config.apiUrl, appId: config.appId },
+            this.authBridge,
             {
                 setMode: this.setMode.bind(this),
                 enableEditing: this.enableEditing.bind(this),
@@ -240,8 +247,16 @@ class EditorController {
                 fetchSavedContentKeys: this.fetchSavedContentKeys.bind(this),
                 showToolbar: this.showToolbar.bind(this),
                 removeToolbar: this.removeToolbar.bind(this),
-                updateMediaManagerApiKey: () => this.modalManager.updateMediaManagerApiKey(),
                 hasUnsavedChanges: () => this.saveManager.hasUnsavedChanges(),
+                setToolbarWarning: (message) => {
+                    if (this.state.toolbar) {
+                        this.state.toolbar.warning = message;
+                    }
+                    if (message) {
+                        this.state.domainWarningShown = true;
+                    }
+                },
+                removeLoadingIndicator: () => this.removeLoadingIndicator(),
             },
         );
     }
@@ -329,6 +344,9 @@ class EditorController {
         this.log.info("Lazy module initializing", {
             appId: this.config.appId,
         });
+
+        // Show loading indicator while we wait for auth bridge
+        this.showLoadingIndicator();
 
         // Scan for templates first (assigns instance IDs when no API data)
         this.templateManager.scanTemplates();
@@ -724,6 +742,9 @@ class EditorController {
     }
 
     private showToolbar(): void {
+        // Remove loading indicator if present
+        this.removeLoadingIndicator();
+
         const isReadOnly = this.state.permissions?.contentWrite === false;
         const denyAppGui = this.state.permissions?.denyAppGui === true;
 
@@ -840,6 +861,63 @@ class EditorController {
         if (this.spacerElement) {
             this.spacerElement.remove();
             this.spacerElement = null;
+        }
+    }
+
+    /**
+     * Show a loading indicator at the bottom of the page while auth bridge connects
+     */
+    private showLoadingIndicator(): void {
+        if (this.loadingIndicator) return;
+
+        const indicator = document.createElement("div");
+        indicator.id = "scms-loading";
+        indicator.innerHTML = `
+            <style>
+                #scms-loading {
+                    position: fixed;
+                    bottom: 0;
+                    left: 0;
+                    right: 0;
+                    height: 48px;
+                    background: white;
+                    color: #374151;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 10px;
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                    font-size: 14px;
+                    z-index: 2147483646;
+                    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
+                    border-top: 1px solid #e5e7eb;
+                }
+                #scms-loading .spinner {
+                    width: 16px;
+                    height: 16px;
+                    border: 2px solid #e5e7eb;
+                    border-top-color: #3b82f6;
+                    border-radius: 50%;
+                    animation: scms-spin 0.8s linear infinite;
+                }
+                @keyframes scms-spin {
+                    to { transform: rotate(360deg); }
+                }
+            </style>
+            <div class="spinner"></div>
+            <span>Loading StreamlinedCMS editor...</span>
+        `;
+        document.body.appendChild(indicator);
+        this.loadingIndicator = indicator;
+    }
+
+    /**
+     * Remove the loading indicator
+     */
+    private removeLoadingIndicator(): void {
+        if (this.loadingIndicator) {
+            this.loadingIndicator.remove();
+            this.loadingIndicator = null;
         }
     }
 

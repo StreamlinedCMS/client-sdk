@@ -39,11 +39,10 @@ interface SelectFileResult {
     error?: string;
 }
 
-/** Result from authenticate call */
-interface AuthResult {
-    success: boolean;
-    error?: string;
-}
+/** Result from ready call */
+type ReadyResult =
+    | { ready: true }
+    | { ready: false; error: string };
 
 /** Result from cancelCurrentRequest call */
 interface CancelRequestResult {
@@ -59,7 +58,7 @@ interface UploadFileResult {
 
 /** Methods exposed by the media manager iframe */
 interface MediaManagerMethods {
-    authenticate(apiKey: string): Promise<AuthResult>;
+    ready(): Promise<ReadyResult>;
     selectFile(options?: SelectFileOptions): Promise<SelectFileResult>;
     cancelCurrentRequest(): Promise<CancelRequestResult>;
     uploadFile(candidate: Candidate): Promise<UploadFileResult>;
@@ -78,9 +77,6 @@ export class MediaManagerModal extends LitElement {
     @property({ type: String, attribute: "app-id" })
     appId = "";
 
-    @property({ type: String, attribute: "api-key" })
-    apiKey = "";
-
     @state()
     private iframe: HTMLIFrameElement | null = null;
 
@@ -94,7 +90,7 @@ export class MediaManagerModal extends LitElement {
     private connectionReady = false;
 
     @state()
-    private authenticated = false;
+    private isReady = false;
 
     @state()
     private error: string | null = null;
@@ -118,12 +114,12 @@ export class MediaManagerModal extends LitElement {
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                visibility: hidden;
+                opacity: 0;
                 pointer-events: none;
             }
 
             :host([open]) {
-                visibility: visible;
+                opacity: 1;
                 pointer-events: auto;
             }
 
@@ -263,11 +259,6 @@ export class MediaManagerModal extends LitElement {
                 this.initializeIframe();
             }
         }
-
-        // Re-authenticate if apiKey changes after connection
-        if (changedProperties.has("apiKey") && this.connectionReady && this.apiKey) {
-            this.authenticate();
-        }
     }
 
     private initializeIframe() {
@@ -309,30 +300,28 @@ export class MediaManagerModal extends LitElement {
             this.mediaManager = await connection.promise;
             this.connectionReady = true;
 
-            // Authenticate if we have an API key
-            if (this.apiKey) {
-                await this.authenticate();
-            }
+            // Check if media manager is ready (auth bridge has authenticated)
+            await this.checkReady();
         } catch (err) {
             this.error = `Connection failed: ${err instanceof Error ? err.message : String(err)}`;
         }
     }
 
-    private async authenticate() {
-        if (!this.mediaManager || !this.apiKey) return;
+    private async checkReady() {
+        if (!this.mediaManager) return;
 
         try {
-            const result = await this.mediaManager.authenticate(this.apiKey);
-            if (result.success) {
-                this.authenticated = true;
+            const result = await this.mediaManager.ready();
+            if (result.ready) {
+                this.isReady = true;
                 this.error = null;
             } else {
-                this.authenticated = false;
-                this.error = result.error || "Authentication failed";
+                this.isReady = false;
+                this.error = result.error || "Media manager not ready";
             }
         } catch (err) {
-            this.authenticated = false;
-            this.error = `Authentication error: ${err instanceof Error ? err.message : String(err)}`;
+            this.isReady = false;
+            this.error = `Ready check error: ${err instanceof Error ? err.message : String(err)}`;
         }
     }
 
@@ -343,12 +332,12 @@ export class MediaManagerModal extends LitElement {
         }
         this.mediaManager = null;
         this.connectionReady = false;
-        this.authenticated = false;
+        this.isReady = false;
         document.removeEventListener("keydown", this.handleKeydown);
     }
 
     /**
-     * Wait for the connection to be ready and authenticated.
+     * Wait for the connection to be ready.
      * Returns true if ready, false if an error occurred.
      */
     private waitForReady(): Promise<boolean> {
@@ -358,7 +347,7 @@ export class MediaManagerModal extends LitElement {
                     resolve(false);
                     return;
                 }
-                if (this.mediaManager && this.authenticated) {
+                if (this.mediaManager && this.isReady) {
                     resolve(true);
                     return;
                 }
@@ -557,7 +546,7 @@ export class MediaManagerModal extends LitElement {
      * Request the modal to close, cancelling any pending request.
      */
     private async requestClose() {
-        if (this.mediaManager && this.connectionReady && this.authenticated) {
+        if (this.mediaManager && this.connectionReady && this.isReady) {
             // Show closing spinner while we wait for the cancel to complete
             this.closing = true;
 
@@ -591,7 +580,7 @@ export class MediaManagerModal extends LitElement {
         if (this.error) return null; // Error shown separately
         if (this.closing) return "Closing...";
         if (!this.connectionReady) return "Connecting...";
-        if (!this.authenticated) return "Authenticating...";
+        if (!this.isReady) return "Connecting...";
         return null;
     }
 
@@ -618,7 +607,7 @@ export class MediaManagerModal extends LitElement {
                         </svg>
                     </button>
                 </div>
-                <div class="iframe-container${this.connectionReady && this.authenticated && !this.error ? ' ready' : ''}">
+                <div class="iframe-container${this.connectionReady && this.isReady && !this.error ? ' ready' : ''}">
                     ${statusMessage
                         ? html`<div class="status"><div class="spinner"></div><span class="status-text">${statusMessage}</span></div>`
                         : null}

@@ -3,7 +3,7 @@
  *
  * Responsible for:
  * - Setting up auth UI (sign-in/sign-out links)
- * - Validating API keys
+ * - Validating API keys via auth bridge
  * - Handling sign-in popup flow
  * - Handling sign-out
  * - Managing custom sign-in triggers
@@ -13,15 +13,7 @@ import type { Logger } from "loganite";
 import type { EditorState } from "./state.js";
 import type { KeyStorage } from "../key-storage.js";
 import type { PopupManager } from "../popup-manager.js";
-import type { AppPermissions } from "../types.js";
-
-/**
- * Configuration for AuthManager
- */
-export interface AuthManagerConfig {
-    apiUrl: string;
-    appId: string;
-}
+import type { AuthBridge } from "./auth-bridge.js";
 
 /**
  * Helpers that AuthManager needs from EditorController
@@ -33,8 +25,9 @@ export interface AuthManagerHelpers {
     fetchSavedContentKeys: () => Promise<boolean>;
     showToolbar: () => void;
     removeToolbar: () => void;
-    updateMediaManagerApiKey: () => void;
     hasUnsavedChanges: () => boolean;
+    setToolbarWarning: (message: string | null) => void;
+    removeLoadingIndicator: () => void;
 }
 
 export class AuthManager {
@@ -54,7 +47,7 @@ export class AuthManager {
         private log: Logger,
         private keyStorage: KeyStorage,
         private popupManager: PopupManager,
-        private config: AuthManagerConfig,
+        private authBridge: AuthBridge,
         private helpers: AuthManagerHelpers,
     ) {}
 
@@ -65,9 +58,32 @@ export class AuthManager {
         const storedKey = this.keyStorage.getStoredKey();
 
         if (storedKey) {
-            // Validate the stored key before trusting it
-            const isValid = await this.validateApiKey(storedKey);
-            if (!isValid) {
+            // Validate the stored key via auth bridge
+            const result = await this.authBridge.authenticate(storedKey);
+
+            if (!result.valid) {
+                // Handle different error types
+                if (this.isConnectionError(result.error)) {
+                    this.log.warn("Auth bridge connection error", { error: result.error });
+                    this.helpers.setToolbarWarning(
+                        "Authentication service unavailable. Refresh the page or contact your website administrator.",
+                    );
+                    // Don't clear the key on connection errors - might be temporary
+                    this.showSignInLink();
+                    return;
+                }
+
+                if (result.error === "Origin not allowed") {
+                    this.log.warn("Domain not allowed", { error: result.error });
+                    const domain = window.location.hostname;
+                    this.helpers.setToolbarWarning(
+                        `Domain "${domain}" is not whitelisted. Add it in Admin → Settings.`,
+                    );
+                    this.showSignInLink();
+                    return;
+                }
+
+                // Invalid API key - clear it and show sign-in
                 this.log.info("Stored API key is no longer valid, clearing");
                 this.keyStorage.clearStoredKey();
                 this.showSignInLink();
@@ -75,10 +91,9 @@ export class AuthManager {
             }
 
             this.state.apiKey = storedKey;
-            this.helpers.updateMediaManagerApiKey();
+            this.state.permissions = result.permissions;
 
-            // Fetch user permissions
-            await this.fetchPermissions(storedKey);
+            this.log.debug("Authentication successful", { permissions: result.permissions });
 
             // Set up all custom triggers as sign-out
             const customTriggers = document.querySelectorAll("[data-scms-signin]");
@@ -108,63 +123,31 @@ export class AuthManager {
     }
 
     /**
-     * Validate an API key by making a request to the keys/@me endpoint
-     * Returns true if valid, false if invalid (401/403) or on network error
+     * Check if an error is a connection-related error
      */
-    async validateApiKey(apiKey: string): Promise<boolean> {
-        try {
-            const response = await fetch(
-                `${this.config.apiUrl}/apps/${this.config.appId}/keys/@me`,
-                {
-                    headers: { Authorization: `Bearer ${apiKey}` },
-                },
-            );
-
-            if (response.status === 401 || response.status === 403) {
-                return false;
-            }
-
-            return response.ok;
-        } catch (error) {
-            this.log.warn("Failed to validate API key", error);
-            // On network error, assume key is still valid to avoid logging user out
-            return true;
-        }
+    private isConnectionError(error: string): boolean {
+        const connectionErrors = [
+            "Auth bridge connection failed",
+            "Auth bridge not connected",
+            "Authentication request failed",
+            "Could not determine parent origin",
+        ];
+        return connectionErrors.some((e) => error.includes(e));
     }
 
     /**
-     * Fetch user permissions from the members/@me endpoint.
-     * Updates state.permissions on success.
-     * Returns the permissions object, or null on failure.
+     * Refetch permissions via auth bridge.
+     * Used after a 403 error to check if permissions have changed.
      */
-    async fetchPermissions(apiKey: string): Promise<AppPermissions | null> {
-        try {
-            const response = await fetch(
-                `${this.config.apiUrl}/apps/${this.config.appId}/members/@me`,
-                {
-                    headers: { Authorization: `Bearer ${apiKey}` },
-                },
-            );
+    async refetchPermissions(): Promise<void> {
+        if (!this.state.apiKey) return;
 
-            if (!response.ok) {
-                this.log.warn("Failed to fetch permissions", { status: response.status });
-                return null;
-            }
-
-            const data = await response.json();
-            const permissions = data.role?.permissions as AppPermissions | undefined;
-
-            if (permissions) {
-                this.state.permissions = permissions;
-                this.log.debug("Fetched permissions", { permissions });
-                return permissions;
-            }
-
-            this.log.warn("No permissions in member response", { data });
-            return null;
-        } catch (error) {
-            this.log.warn("Failed to fetch permissions", error);
-            return null;
+        const result = await this.authBridge.authenticate(this.state.apiKey);
+        if (result.valid) {
+            this.state.permissions = result.permissions;
+            this.log.debug("Refetched permissions", { permissions: result.permissions });
+        } else {
+            this.log.warn("Failed to refetch permissions", { error: result.error });
         }
     }
 
@@ -172,6 +155,7 @@ export class AuthManager {
      * Show sign-in link UI (either custom triggers or default Lit component)
      */
     showSignInLink(): void {
+        this.helpers.removeLoadingIndicator();
         this.helpers.removeToolbar();
 
         // Check for custom triggers
@@ -209,12 +193,27 @@ export class AuthManager {
 
         const key = await this.popupManager.openLoginPopup();
         if (key) {
-            this.state.apiKey = key;
-            this.helpers.updateMediaManagerApiKey();
-            this.keyStorage.storeKey(key);
+            // Validate via auth bridge and get permissions
+            const result = await this.authBridge.authenticate(key);
+            if (!result.valid) {
+                this.log.warn("Sign-in failed", { error: result.error });
+                // Show appropriate error
+                if (this.isConnectionError(result.error)) {
+                    this.helpers.setToolbarWarning(
+                        "Authentication service unavailable. Refresh the page or contact your website administrator.",
+                    );
+                } else if (result.error === "Origin not allowed") {
+                    const domain = window.location.hostname;
+                    this.helpers.setToolbarWarning(
+                        `Domain "${domain}" is not whitelisted. Add it in Admin → Settings.`,
+                    );
+                }
+                return;
+            }
 
-            // Fetch user permissions
-            await this.fetchPermissions(key);
+            this.state.apiKey = key;
+            this.state.permissions = result.permissions;
+            this.keyStorage.storeKey(key);
 
             // Remove default sign-in link if present
             const signInLink = document.getElementById("scms-signin-link");
@@ -253,7 +252,6 @@ export class AuthManager {
         this.keyStorage.clearStoredKey();
         this.state.apiKey = null;
         this.state.permissions = null;
-        this.helpers.updateMediaManagerApiKey();
         this.state.currentMode = "viewer";
 
         this.helpers.disableEditing();

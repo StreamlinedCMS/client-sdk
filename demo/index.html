@@ -5,10 +5,6 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>Streamlined CMS - Feature Demo</title>
 
-        <!-- Mobile debugging console (eruda) - shows floating button to open dev tools -->
-        <script src="https://cdn.jsdelivr.net/npm/eruda"></script>
-        <script>eruda.init();</script>
-
         <!-- Load the SDK - just one script tag, no FOUC -->
         <script
             src="/dist/streamlined-cms.js"
@@ -946,6 +942,16 @@
                 // Set initial page from URL hash
                 const initialPage = getPageFromHash();
                 showPage(initialPage, window.location.hash === "");
+            })();
+        </script>
+
+        <!-- Mobile debugging console (eruda) - loaded async so it doesn't block SDK -->
+        <script>
+            (function() {
+                var script = document.createElement('script');
+                script.src = 'https://cdn.jsdelivr.net/npm/eruda';
+                script.onload = function() { eruda.init(); };
+                document.body.appendChild(script);
             })();
         </script>
     </body>
