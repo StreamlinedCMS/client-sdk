@@ -628,7 +628,7 @@ class EditorController {
             element.addEventListener("click", (e) => {
                 if (this.state.editingEnabled) {
                     e.preventDefault();
-                    e.stopPropagation();
+                    e.stopImmediatePropagation();
 
                     const isMobile = window.innerWidth < 640;
 
@@ -672,7 +672,7 @@ class EditorController {
             element.addEventListener("dblclick", (e) => {
                 if (this.state.editingEnabled) {
                     e.preventDefault();
-                    e.stopPropagation();
+                    e.stopImmediatePropagation();
                     this.modalManager.handleChangeImage();
                 }
             });
@@ -684,7 +684,7 @@ class EditorController {
             element.addEventListener("dblclick", (e) => {
                 if (this.state.editingEnabled) {
                     e.preventDefault();
-                    e.stopPropagation();
+                    e.stopImmediatePropagation();
                     this.modalManager.handleGoToLink();
                 }
             });
