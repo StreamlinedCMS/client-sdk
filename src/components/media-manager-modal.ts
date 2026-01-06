@@ -371,6 +371,11 @@ export class MediaManagerModal extends LitElement {
         this.open = true;
         this.closing = false;
 
+        // Re-check ready state (auth status may have changed since init)
+        if (this.connectionReady && !this.isReady) {
+            await this.checkReady();
+        }
+
         // Wait for connection and authentication
         const ready = await this.waitForReady();
         if (!ready) {
@@ -494,6 +499,11 @@ export class MediaManagerModal extends LitElement {
     }> {
         const uploaded: MediaFile[] = [];
         const errors: Array<{ src: string; error: string }> = [];
+
+        // Re-check ready state (auth status may have changed since init)
+        if (this.connectionReady && !this.isReady) {
+            await this.checkReady();
+        }
 
         // Wait for connection and authentication
         const ready = await this.waitForReady();
