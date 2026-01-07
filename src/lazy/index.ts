@@ -69,7 +69,9 @@ import "../components/seo-modal.js";
 import "../components/accessibility-modal.js";
 import "../components/attributes-modal.js";
 import "../components/media-manager-modal.js";
+import "../components/help-panel.js";
 import type { Toolbar } from "../components/toolbar.js";
+import type { HelpPanel } from "../components/help-panel.js";
 import {
     createEditorState,
     type EditorState,
@@ -649,8 +651,8 @@ class EditorController {
         // Check if clicking inside a template instance
         const clickedInstance = (target as Element).closest?.("[data-scms-instance]") as HTMLElement | null;
 
-        // Deselect instance if clicking outside all instances
-        if (this.state.selectedInstance && !clickedInstance) {
+        // Deselect instance if clicking outside all instances (but not if clicking toolbar)
+        if (this.state.selectedInstance && !clickedInstance && !this.state.toolbar?.contains(target)) {
             this.editingManager.deselectInstance();
         }
 
@@ -1215,130 +1217,66 @@ class EditorController {
     }
 
     /**
-     * Handle help button click - show available tours
+     * Handle help button click - toggle help panel
      */
     private handleHelp(): void {
-        this.showHelpPanel();
+        this.toggleHelpPanel();
     }
 
+    private helpPanel: HelpPanel | null = null;
+    private helpPanelCloseHandler: ((e: MouseEvent) => void) | null = null;
+
     /**
-     * Show a panel with available tours
+     * Toggle the help panel visibility
      */
-    private async showHelpPanel(): Promise<void> {
+    private async toggleHelpPanel(): Promise<void> {
         // Remove existing panel if present
-        const existingPanel = document.getElementById("scms-help-panel");
-        if (existingPanel) {
-            existingPanel.remove();
+        if (this.helpPanel) {
+            this.closeHelpPanel();
             return;
         }
 
-        const panel = document.createElement("div");
-        panel.id = "scms-help-panel";
-        panel.style.cssText = `
-            position: fixed;
-            bottom: 60px;
-            right: 16px;
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
-            padding: 16px;
-            z-index: 10001;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            min-width: 220px;
-        `;
+        const panel = document.createElement("scms-help-panel") as HelpPanel;
+        panel.loading = true;
 
-        const title = document.createElement("div");
-        title.style.cssText = `
-            font-weight: 600;
-            font-size: 14px;
-            margin-bottom: 12px;
-            color: #374151;
-        `;
-        title.textContent = "Guided Tours";
-        panel.appendChild(title);
-
-        // Show loading state
-        const loading = document.createElement("div");
-        loading.style.cssText = `
-            font-size: 13px;
-            color: #6b7280;
-            padding: 8px 0;
-        `;
-        loading.textContent = "Loading tours...";
-        panel.appendChild(loading);
-
-        // Add close button and append panel immediately
-        const closeBtn = document.createElement("button");
-        closeBtn.style.cssText = `
-            position: absolute;
-            top: 8px;
-            right: 8px;
-            width: 24px;
-            height: 24px;
-            border: none;
-            background: none;
-            cursor: pointer;
-            color: #9ca3af;
-            font-size: 18px;
-            line-height: 1;
-        `;
-        closeBtn.innerHTML = "&times;";
-        closeBtn.addEventListener("click", () => panel.remove());
-        panel.appendChild(closeBtn);
+        panel.addEventListener("close", () => this.closeHelpPanel());
+        panel.addEventListener("tour-select", (e: Event) => {
+            const tourId = (e as CustomEvent<{ tourId: string }>).detail.tourId;
+            this.closeHelpPanel();
+            this.startTour(tourId);
+        });
 
         document.body.appendChild(panel);
+        this.helpPanel = panel;
 
         // Close on click outside
-        const closeOnOutsideClick = (e: MouseEvent) => {
-            if (!panel.contains(e.target as Node)) {
-                panel.remove();
-                document.removeEventListener("click", closeOnOutsideClick);
+        this.helpPanelCloseHandler = (e: MouseEvent) => {
+            if (this.helpPanel && !this.helpPanel.contains(e.target as Node)) {
+                this.closeHelpPanel();
             }
         };
         setTimeout(() => {
-            document.addEventListener("click", closeOnOutsideClick);
+            document.addEventListener("click", this.helpPanelCloseHandler!);
         }, 0);
 
         // Load tours asynchronously
         const tourDefs = await getTourDefinitions();
+        panel.tours = tourDefs;
+        panel.loading = false;
+    }
 
-        // Remove loading indicator
-        loading.remove();
-
-        tourDefs.forEach((tour) => {
-            const button = document.createElement("button");
-            button.style.cssText = `
-                display: block;
-                width: 100%;
-                text-align: left;
-                padding: 10px 12px;
-                margin-bottom: 8px;
-                border: 1px solid #e5e7eb;
-                border-radius: 6px;
-                background: #f9fafb;
-                cursor: pointer;
-                transition: all 0.15s;
-            `;
-            button.innerHTML = `
-                <div style="font-weight: 500; font-size: 13px; color: #374151;">${tour.label}</div>
-                <div style="font-size: 12px; color: #6b7280; margin-top: 2px;">${tour.description}</div>
-            `;
-            button.addEventListener("mouseenter", () => {
-                button.style.background = "#f3f4f6";
-                button.style.borderColor = "#d1d5db";
-            });
-            button.addEventListener("mouseleave", () => {
-                button.style.background = "#f9fafb";
-                button.style.borderColor = "#e5e7eb";
-            });
-            button.addEventListener("click", () => {
-                panel.remove();
-                document.removeEventListener("click", closeOnOutsideClick);
-                this.startTour(tour.id);
-            });
-            // Insert before close button
-            panel.insertBefore(button, closeBtn);
-        });
+    /**
+     * Close the help panel
+     */
+    private closeHelpPanel(): void {
+        if (this.helpPanel) {
+            this.helpPanel.remove();
+            this.helpPanel = null;
+        }
+        if (this.helpPanelCloseHandler) {
+            document.removeEventListener("click", this.helpPanelCloseHandler);
+            this.helpPanelCloseHandler = null;
+        }
     }
 }
 

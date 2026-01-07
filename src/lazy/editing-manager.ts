@@ -128,6 +128,9 @@ export class EditingManager {
 
         this.state.selectedInstance = instanceElement;
         instanceElement.classList.add("scms-instance-selected");
+
+        // Update toolbar to show template controls
+        this.helpers.updateToolbarTemplateContext();
     }
 
     /**
@@ -138,6 +141,9 @@ export class EditingManager {
 
         this.state.selectedInstance.classList.remove("scms-instance-selected");
         this.state.selectedInstance = null;
+
+        // Update toolbar to clear template controls
+        this.helpers.updateToolbarTemplateContext();
     }
 
     /**
