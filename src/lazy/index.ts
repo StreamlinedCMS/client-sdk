@@ -639,15 +639,17 @@ class EditorController {
         setTimeout(() => {
             const toolbarHeight = this.state.toolbar?.offsetHeight ?? 60;
 
-            // Use visualViewport if available (accounts for keyboard on mobile)
-            const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+            // Two possible constraints on visible height:
+            // 1. Window minus toolbar (when keyboard is closed)
+            // 2. Visual viewport (when keyboard is open, it covers the toolbar)
+            const windowMinusToolbar = window.innerHeight - toolbarHeight;
+            const visualViewportHeight = window.visualViewport?.height ?? window.innerHeight;
+            const visibleHeight = Math.min(windowMinusToolbar, visualViewportHeight);
+
             const viewportTop = window.visualViewport?.offsetTop ?? 0;
-
-            const visibleHeight = viewportHeight - toolbarHeight;
-
             const rect = element.getBoundingClientRect();
             const elementCenter = rect.top + rect.height / 2 - viewportTop;
-            const targetCenter = toolbarHeight + visibleHeight / 2;
+            const targetCenter = visibleHeight / 2;
             const scrollOffset = elementCenter - targetCenter;
 
             window.scrollBy({ top: scrollOffset, behavior: "smooth" });
@@ -761,10 +763,14 @@ class EditorController {
                         this.state.lastTapKey = null;
                         this.state.lastTapTime = 0;
                     } else if (isMobile) {
-                        // Mobile two-step: first tap selects, second tap edits
-                        if (this.state.selectedKey === key && this.state.editingKey !== key) {
+                        // Mobile: images go straight to editing, others use two-step
+                        if (elementType === "image") {
+                            this.editingManager.startEditing(key, element);
+                        } else if (this.state.selectedKey === key && this.state.editingKey !== key) {
+                            // Two-step: second tap edits
                             this.editingManager.startEditing(key, element);
                         } else {
+                            // Two-step: first tap selects
                             this.editingManager.selectElement(key, element);
                         }
                         this.state.lastTapKey = key;

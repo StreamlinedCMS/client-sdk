@@ -4,7 +4,8 @@
 
 import type { TourStep, TourContext } from "../types";
 import { observeElementAppears, observeAttributeAdded } from "../common";
-import { getToolbarDropdown, getOpenDropdownMenu } from "../common/desktop";
+import { queryShadowSelector } from "../common/shadow-dom";
+import { getToolbarDropdown } from "../common/desktop";
 
 /**
  * Click the More dropdown
@@ -12,7 +13,7 @@ import { getToolbarDropdown, getOpenDropdownMenu } from "../common/desktop";
  */
 export function clickMoreStep(ctx: TourContext): TourStep {
     return {
-        element: "scms-toolbar",
+        element: () => getToolbarDropdown("More"),
         popover: {
             title: "Open the More Menu",
             description: 'Click "More" to see additional options.',
@@ -43,14 +44,14 @@ export function clickMoreStep(ctx: TourContext): TourStep {
 
 /**
  * Click SEO in the open dropdown
- * Highlights the dropdown menu (found in toolbar's shadow DOM)
+ * Highlights the SEO button in the dropdown menu
  */
 export function clickSeoInMenuStep(ctx: TourContext): TourStep {
     return {
-        element: () => getOpenDropdownMenu("More"),
+        element: () => queryShadowSelector("scms-toolbar >>> button[data-action='seo']"),
         popover: {
             title: "Open SEO Settings",
-            description: 'Click "SEO" in the dropdown menu.',
+            description: 'Click "SEO" to configure search engine optimization.',
             side: "left",
             align: "start",
             showButtons: ["close"],
@@ -68,27 +69,8 @@ export function clickSeoInMenuStep(ctx: TourContext): TourStep {
 }
 
 /**
- * Detailed explanation of field relevance (desktop only - too verbose for mobile)
- */
-export function fieldRelevanceStep(_ctx: TourContext): TourStep {
-    return {
-        element: () => document.querySelector("scms-seo-modal") as HTMLElement,
-        popover: {
-            title: "Field Relevance",
-            description:
-                "Fields are organized by relevance:<br><br>" +
-                "<strong>Primary</strong> - Most important for this element type.<br><br>" +
-                "<strong>Secondary</strong> - Available but less common.<br><br>" +
-                'Toggle "Show all fields" to see everything.',
-            side: "left",
-            align: "center",
-        },
-    };
-}
-
-/**
  * Get desktop-specific steps
  */
-export function desktopSteps(ctx: TourContext): TourStep[] {
-    return [fieldRelevanceStep(ctx)];
+export function desktopSteps(_ctx: TourContext): TourStep[] {
+    return [];
 }

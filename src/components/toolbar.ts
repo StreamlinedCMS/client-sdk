@@ -408,6 +408,7 @@ export class Toolbar extends ScmsElement {
         return html`
             <button
                 class="px-3 py-1.5 text-xs font-medium text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+                data-action="edit-html"
                 @click=${this.handleEditHtml}
             >
                 Edit HTML
@@ -420,6 +421,7 @@ export class Toolbar extends ScmsElement {
         return html`
             <button
                 class="px-3 py-1.5 text-xs font-medium text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+                data-action="change-image"
                 @click=${this.handleChangeImage}
             >
                 Change Image
@@ -432,6 +434,7 @@ export class Toolbar extends ScmsElement {
         return html`
             <button
                 class="px-3 py-1.5 text-xs font-medium text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+                data-action="edit-link"
                 @click=${this.handleEditLink}
             >
                 Edit Link
@@ -444,6 +447,7 @@ export class Toolbar extends ScmsElement {
         return html`
             <button
                 class="px-3 py-1.5 text-xs font-medium text-blue-600 hover:text-blue-800 border border-blue-300 rounded-md hover:bg-blue-50 transition-colors inline-flex items-center gap-1"
+                data-action="go-to-link"
                 @click=${this.handleGoToLink}
             >
                 Go to Link
@@ -494,9 +498,9 @@ export class Toolbar extends ScmsElement {
 
         return html`
             <scms-dropdown-menu label="More" .icon=${Ellipsis} direction="up">
-                <button @click=${this.handleEditSeo}>SEO</button>
-                <button @click=${this.handleEditAccessibility}>Accessibility</button>
-                <button @click=${this.handleEditAttributes}>Attributes</button>
+                <button @click=${this.handleEditSeo} data-action="seo">SEO</button>
+                <button @click=${this.handleEditAccessibility} data-action="accessibility">Accessibility</button>
+                <button @click=${this.handleEditAttributes} data-action="attributes">Attributes</button>
             </scms-dropdown-menu>
         `;
     }
@@ -513,16 +517,16 @@ export class Toolbar extends ScmsElement {
 
         return html`
             <scms-dropdown-menu label="Template" .icon=${Layers} direction="up">
-                <button ?disabled=${!canMoveUp} @click=${this.handleMoveInstanceUp}>
+                <button ?disabled=${!canMoveUp} @click=${this.handleMoveInstanceUp} data-action="move-up">
                     <span class="[&>svg]:w-4 [&>svg]:h-4">${unsafeSVG(ChevronUp)}</span>
                     Move Up
                 </button>
-                <button ?disabled=${!canMoveDown} @click=${this.handleMoveInstanceDown}>
+                <button ?disabled=${!canMoveDown} @click=${this.handleMoveInstanceDown} data-action="move-down">
                     <span class="[&>svg]:w-4 [&>svg]:h-4">${unsafeSVG(ChevronDown)}</span>
                     Move Down
                 </button>
                 <hr />
-                <button @click=${this.handleAddInstance} style="color: #16a34a;">
+                <button @click=${this.handleAddInstance} style="color: #16a34a;" data-action="add-item">
                     <span class="[&>svg]:w-4 [&>svg]:h-4">${unsafeSVG(Plus)}</span>
                     Add Item
                 </button>
@@ -530,6 +534,7 @@ export class Toolbar extends ScmsElement {
                     ?disabled=${!canDelete}
                     @click=${this.handleDeleteInstance}
                     style="color: ${canDelete ? "#dc2626" : ""};"
+                    data-action="delete-item"
                 >
                     <span class="[&>svg]:w-4 [&>svg]:h-4">${unsafeSVG(Trash2)}</span>
                     Delete
@@ -578,6 +583,7 @@ export class Toolbar extends ScmsElement {
         return html`
             <button
                 class="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors [&>svg]:w-5 [&>svg]:h-5"
+                data-action="help"
                 @click=${this.handleHelp}
                 title="Help"
                 aria-label="Help"
@@ -595,7 +601,7 @@ export class Toolbar extends ScmsElement {
             : "px-4 py-1.5 text-xs font-medium rounded-md transition-colors bg-red-600 text-white hover:bg-red-700";
 
         return html`
-            <button class=${saveClasses} ?disabled=${this.saving} @click=${this.handleSave}>
+            <button class=${saveClasses} ?disabled=${this.saving} data-action="save" @click=${this.handleSave}>
                 ${this.saving ? "Saving..." : "Save"}
             </button>
         `;
@@ -693,12 +699,14 @@ export class Toolbar extends ScmsElement {
                     <div class="flex gap-2">
                         <button
                             class="flex-1 px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-white transition-colors"
+                            data-action="edit-link"
                             @click=${this.handleEditLink}
                         >
                             Edit Link
                         </button>
                         <button
                             class="flex-1 px-3 py-2 text-sm font-medium text-blue-600 hover:text-blue-800 border border-blue-300 rounded-md hover:bg-blue-50 transition-colors inline-flex items-center justify-center gap-1"
+                            data-action="go-to-link"
                             @click=${this.handleGoToLink}
                         >
                             Go to Link
@@ -724,6 +732,7 @@ export class Toolbar extends ScmsElement {
                 return html`
                     <button
                         class="w-full px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-white transition-colors"
+                        data-action="change-image"
                         @click=${this.handleChangeImage}
                     >
                         Change Image
@@ -735,6 +744,7 @@ export class Toolbar extends ScmsElement {
                 return html`
                     <button
                         class="w-full px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-white transition-colors"
+                        data-action="edit-html"
                         @click=${this.handleEditHtml}
                     >
                         Edit HTML
@@ -753,6 +763,7 @@ export class Toolbar extends ScmsElement {
         return html`
             <div
                 class="mobile-section mb-4 pb-4 border-b border-gray-200 bg-gray-50 -mx-4 px-4 py-3"
+                data-section="element"
             >
                 ${this.renderMobileSectionHeader("Element", "element")}
                 ${isCollapsed ? nothing : content}
@@ -764,7 +775,7 @@ export class Toolbar extends ScmsElement {
         const isCollapsed = this.isSectionCollapsed("metadata");
 
         return html`
-            <div class="mobile-section mb-4 pb-4 border-b border-gray-200">
+            <div class="mobile-section mb-4 pb-4 border-b border-gray-200" data-section="metadata">
                 ${this.renderMobileSectionHeader("Metadata", "metadata")}
                 ${isCollapsed
                     ? nothing
@@ -773,17 +784,20 @@ export class Toolbar extends ScmsElement {
                               <button
                                   class="w-full px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors text-left"
                                   @click=${this.handleEditSeo}
+                                  data-action="seo"
                               >
                                   SEO (Search Engine Optimization)
                               </button>
                               <button
                                   class="w-full px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors text-left"
+                                  data-action="accessibility"
                                   @click=${this.handleEditAccessibility}
                               >
                                   Accessibility
                               </button>
                               <button
                                   class="w-full px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors text-left"
+                                  data-action="attributes"
                                   @click=${this.handleEditAttributes}
                               >
                                   Attributes
@@ -798,7 +812,7 @@ export class Toolbar extends ScmsElement {
         const isCollapsed = this.isSectionCollapsed("actions");
 
         return html`
-            <div class="mobile-section mb-4 pb-4 border-b border-gray-200">
+            <div class="mobile-section mb-4 pb-4 border-b border-gray-200" data-section="actions">
                 ${this.renderMobileSectionHeader("Actions", "actions")}
                 ${isCollapsed
                     ? nothing
@@ -831,7 +845,7 @@ export class Toolbar extends ScmsElement {
             "flex-1 px-3 py-2 text-sm font-medium text-gray-300 border border-gray-200 rounded-md cursor-not-allowed inline-flex items-center justify-center";
 
         return html`
-            <div class="mobile-section mb-4 pb-4 border-b border-gray-200">
+            <div class="mobile-section mb-4 pb-4 border-b border-gray-200" data-section="template">
                 ${this.renderMobileSectionHeader("Template Item", "template")}
                 ${isCollapsed
                     ? nothing
@@ -843,6 +857,7 @@ export class Toolbar extends ScmsElement {
                                   <button
                                       class=${canMoveUp ? enabledClass : disabledClass}
                                       ?disabled=${!canMoveUp}
+                                      data-action="move-up"
                                       @click=${this.handleMoveInstanceUp}
                                   >
                                       <svg
@@ -863,6 +878,7 @@ export class Toolbar extends ScmsElement {
                                   <button
                                       class=${canMoveDown ? enabledClass : disabledClass}
                                       ?disabled=${!canMoveDown}
+                                      data-action="move-down"
                                       @click=${this.handleMoveInstanceDown}
                                   >
                                       <svg
@@ -885,6 +901,7 @@ export class Toolbar extends ScmsElement {
                               <div class="flex gap-2">
                                   <button
                                       class="flex-1 px-3 py-2 text-sm font-medium text-green-600 hover:text-green-800 border border-green-300 rounded-md hover:bg-green-50 transition-colors inline-flex items-center justify-center"
+                                      data-action="add-item"
                                       @click=${this.handleAddInstance}
                                   >
                                       <svg
@@ -907,6 +924,7 @@ export class Toolbar extends ScmsElement {
                                           ? "flex-1 px-3 py-2 text-sm font-medium text-red-600 hover:text-red-800 border border-red-300 rounded-md hover:bg-red-50 transition-colors inline-flex items-center justify-center"
                                           : disabledClass}
                                       ?disabled=${!canDelete}
+                                      data-action="delete-item"
                                       @click=${this.handleDeleteInstance}
                                   >
                                       <svg

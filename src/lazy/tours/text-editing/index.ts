@@ -3,60 +3,18 @@
  */
 
 import type { TourDefinition, TourStep, TourContext } from "../types";
-import { desktopSteps } from "./desktop";
-import { mobileSteps } from "./mobile";
+import { selectTextStepDesktop, inlineEditingStepDesktop, saveStepDesktop } from "./desktop";
+import { selectTextStepMobile, tapToEditStepMobile, saveStepMobile } from "./mobile";
 
 /**
- * Step introducing text elements
+ * Step shown when no text elements exist on the page
  */
-function textElementStep(ctx: TourContext): TourStep | null {
-    const element = ctx.findVisibleElement("[data-scms-text]");
-    if (!element) return null;
-
+function noTextElementsStep(): TourStep {
     return {
-        element,
         popover: {
-            title: "Text Elements",
-            description: ctx.isMobile
-                ? "Tap on any text element to edit it directly. Your changes appear instantly."
-                : "Click on any text element to edit it directly. Your changes appear instantly.",
-            side: "bottom",
-            align: "start",
-        },
-    };
-}
-
-/**
- * Step explaining how to edit
- */
-function editingStep(ctx: TourContext): TourStep | null {
-    const element = ctx.findVisibleElement("[data-scms-text]");
-    if (!element) return null;
-
-    return {
-        element,
-        popover: {
-            title: "Editing Text",
-            description: ctx.isMobile
-                ? "Just type to replace the text. Tap outside to finish editing."
-                : "Just type to replace the text. Press Enter or click outside to finish editing.",
-            side: "bottom",
-            align: "start",
-        },
-    };
-}
-
-/**
- * Step about saving
- */
-function saveStep(ctx: TourContext): TourStep {
-    return {
-        element: "scms-toolbar",
-        popover: {
-            title: "Save Your Changes",
-            description: ctx.isMobile
-                ? 'When you\'re done editing, tap "Save" in the toolbar to publish your changes.'
-                : 'When you\'re done editing, click "Save" in the toolbar to publish your changes.',
+            title: "No Text Elements",
+            description:
+                "This page doesn't have a text element. Please try again on a page with editable text.",
             side: "top",
             align: "center",
         },
@@ -69,13 +27,27 @@ export const textEditingTour: TourDefinition = {
     description: "Change headings, paragraphs, and more",
 
     getSteps: (ctx: TourContext) => {
-        const platformSteps = ctx.isMobile ? mobileSteps(ctx) : desktopSteps(ctx);
+        // Check if page has text elements
+        const textElement = ctx.findVisibleElement("[data-scms-text]");
+        if (!textElement) {
+            return [noTextElementsStep()];
+        }
+
+        if (ctx.isMobile) {
+            // On mobile, skip the inline editing explanation step since
+            // re-highlighting the element steals focus from contenteditable.
+            // The keyboard appearing makes it obvious they can type.
+            return [
+                selectTextStepMobile(ctx),
+                tapToEditStepMobile(ctx),
+                saveStepMobile(),
+            ];
+        }
 
         return [
-            textElementStep(ctx),
-            editingStep(ctx),
-            ...platformSteps,
-            saveStep(ctx),
+            selectTextStepDesktop(ctx),
+            inlineEditingStepDesktop(ctx),
+            saveStepDesktop(),
         ];
     },
 };

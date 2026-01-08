@@ -5,7 +5,7 @@
 import type { TourDefinition, TourStep, TourContext } from "../types";
 import { selectElementStep } from "../common";
 import { desktopSteps, clickMoreStep, clickSeoInMenuStep } from "./desktop";
-import { mobileSteps, expandToolbarStepMobile, tapSeoStepMobile } from "./mobile";
+import { mobileSteps, expandToolbarStepMobile, openMetadataSectionStepMobile, tapSeoStepMobile } from "./mobile";
 
 /**
  * Step explaining the SEO modal fields
@@ -61,9 +61,9 @@ export const seoTour: TourDefinition = {
             }),
 
             // Open the SEO modal
-            // Both platforms have two steps to guide through the UI
+            // Both platforms have steps to guide through the UI
             ...(ctx.isMobile
-                ? [expandToolbarStepMobile(ctx), tapSeoStepMobile(ctx)]
+                ? [expandToolbarStepMobile(ctx), openMetadataSectionStepMobile(ctx), tapSeoStepMobile(ctx)]
                 : [clickMoreStep(ctx), clickSeoInMenuStep(ctx)]),
 
             // Explain the modal fields (shared)

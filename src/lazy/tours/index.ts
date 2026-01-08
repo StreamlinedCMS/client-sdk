@@ -9,6 +9,8 @@ import { driver, type Driver, type DriveStep } from "driver.js";
 import driverCss from "driver.js/dist/driver.css";
 import { GripHorizontal } from "lucide-static";
 import type { TourDefinition, TourStep, TourContext } from "./types";
+import * as shadowDomHelpers from "./common/shadow-dom";
+import * as commonHelpers from "./common";
 
 // Re-export types
 export type { TourDefinition } from "./types";
@@ -408,6 +410,14 @@ export class TourManager {
     isActive(): boolean {
         return this.driverInstance?.isActive() ?? false;
     }
+
+    /**
+     * Debug helpers - exposed for console testing
+     */
+    helpers = {
+        ...shadowDomHelpers,
+        ...commonHelpers,
+    };
 
     /**
      * Make a popover element draggable via a handle (works on both desktop and mobile)

@@ -2,61 +2,33 @@
  * Image Editing Tour - Learn how to change images
  */
 
-import type { TourDefinition, TourStep, TourContext } from "../types";
-import { desktopSteps } from "./desktop";
-import { mobileSteps } from "./mobile";
+import type { TourDefinition, TourStep } from "../types";
+import {
+    selectImageStepDesktop,
+    changeImageStepDesktop,
+    mediaManagerStepDesktop,
+    shortcutStepDesktop,
+    saveStepDesktop,
+} from "./desktop";
+import {
+    selectImageStepMobile,
+    expandToolbarStepMobile,
+    openElementSectionStepMobile,
+    changeImageStepMobile,
+    mediaManagerStepMobile,
+    shortcutStepMobile,
+    saveStepMobile,
+} from "./mobile";
 
 /**
- * Step about selecting images
+ * Step shown when no image elements exist on the page
  */
-function selectImageStep(ctx: TourContext): TourStep | null {
-    const element = ctx.findVisibleElement("[data-scms-image]");
-    if (!element) return null;
-
+function noImageElementsStep(): TourStep {
     return {
-        element,
         popover: {
-            title: "Selecting Images",
-            description: ctx.isMobile
-                ? "Tap on an image to select it. A blue outline will appear."
-                : "Click on an image to select it. A blue outline will appear.",
-            side: "bottom",
-            align: "center",
-        },
-    };
-}
-
-/**
- * Step about changing images
- */
-function changeImageStep(ctx: TourContext): TourStep | null {
-    const element = ctx.findVisibleElement("[data-scms-image]");
-    if (!element) return null;
-
-    return {
-        element,
-        popover: {
-            title: "Changing Images",
-            description: ctx.isMobile
-                ? 'Double-tap or use "Change Image" in the toolbar to open the media library.'
-                : 'Double-click or use "Change Image" in the toolbar to open the media library.',
-            side: "bottom",
-            align: "center",
-        },
-    };
-}
-
-/**
- * Step about image options in toolbar
- */
-function imageOptionsStep(ctx: TourContext): TourStep {
-    return {
-        element: "scms-toolbar",
-        popover: {
-            title: "Image Options",
-            description: ctx.isMobile
-                ? "Expand the toolbar and use the Metadata section for SEO (alt text), accessibility, and more."
-                : "Use the 'More' dropdown in the toolbar for SEO (alt text), accessibility, and more.",
+            title: "No Image Elements",
+            description:
+                "This page doesn't have an image element. Please try again on a page with an image.",
             side: "top",
             align: "center",
         },
@@ -68,14 +40,31 @@ export const imageEditingTour: TourDefinition = {
     label: "How do I change images?",
     description: "Replace images and set alt text",
 
-    getSteps: (ctx: TourContext) => {
-        const platformSteps = ctx.isMobile ? mobileSteps(ctx) : desktopSteps(ctx);
+    getSteps: (ctx) => {
+        // Check if page has image elements
+        const imageElement = ctx.findVisibleElement("[data-scms-image]");
+        if (!imageElement) {
+            return [noImageElementsStep()];
+        }
+
+        if (ctx.isMobile) {
+            return [
+                selectImageStepMobile(ctx),
+                expandToolbarStepMobile(ctx),
+                openElementSectionStepMobile(ctx),
+                changeImageStepMobile(ctx),
+                mediaManagerStepMobile(ctx),
+                shortcutStepMobile(ctx),
+                saveStepMobile(),
+            ];
+        }
 
         return [
-            selectImageStep(ctx),
-            changeImageStep(ctx),
-            ...platformSteps,
-            imageOptionsStep(ctx),
+            selectImageStepDesktop(ctx),
+            changeImageStepDesktop(ctx),
+            mediaManagerStepDesktop(ctx),
+            shortcutStepDesktop(ctx),
+            saveStepDesktop(),
         ];
     },
 };

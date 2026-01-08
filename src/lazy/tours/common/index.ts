@@ -81,6 +81,108 @@ export function observeAttributeAdded(
 }
 
 /**
+ * Creates a MutationObserver that watches for an attribute to be removed from a specific element
+ */
+export function observeAttributeRemoved(
+    element: Element,
+    attributeName: string,
+    options: ObserverOptions
+): MutationObserver {
+    const { onMatch, timeout, onTimeout } = options;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+    const observer = new MutationObserver(() => {
+        if (!element.hasAttribute(attributeName)) {
+            observer.disconnect();
+            if (timeoutId) clearTimeout(timeoutId);
+            onMatch();
+        }
+    });
+
+    // Check if already missing attribute
+    if (!element.hasAttribute(attributeName)) {
+        setTimeout(onMatch, 0);
+        return observer;
+    }
+
+    observer.observe(element, {
+        attributes: true,
+        attributeFilter: [attributeName],
+    });
+
+    if (timeout && onTimeout) {
+        timeoutId = setTimeout(() => {
+            observer.disconnect();
+            onTimeout();
+        }, timeout);
+    }
+
+    return observer;
+}
+
+/**
+ * Creates a MutationObserver that watches for an attribute to equal a specific value
+ */
+export function observeAttributeValue(
+    element: Element,
+    attributeName: string,
+    targetValue: string,
+    options: ObserverOptions
+): MutationObserver {
+    const { onMatch, timeout, onTimeout } = options;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+    const observer = new MutationObserver(() => {
+        if (element.getAttribute(attributeName) === targetValue) {
+            observer.disconnect();
+            if (timeoutId) clearTimeout(timeoutId);
+            onMatch();
+        }
+    });
+
+    // Check if already has target value
+    if (element.getAttribute(attributeName) === targetValue) {
+        setTimeout(onMatch, 0);
+        return observer;
+    }
+
+    observer.observe(element, {
+        attributes: true,
+        attributeFilter: [attributeName],
+    });
+
+    if (timeout && onTimeout) {
+        timeoutId = setTimeout(() => {
+            observer.disconnect();
+            onTimeout();
+        }, timeout);
+    }
+
+    return observer;
+}
+
+/**
+ * Reposition the Driver.js popover to the top of the viewport (centered horizontally).
+ * Uses the same style approach as the drag behavior for consistent positioning.
+ * Call this from onHighlighted when the highlighted element is full-screen.
+ */
+export function repositionPopoverTop(topOffset = 20): void {
+    setTimeout(() => {
+        const popover = document.querySelector(".driver-popover") as HTMLElement;
+        if (popover) {
+            const rect = popover.getBoundingClientRect();
+            const left = (window.innerWidth - rect.width) / 2;
+            popover.style.setProperty("position", "fixed", "important");
+            popover.style.setProperty("top", `${topOffset}px`, "important");
+            popover.style.setProperty("left", `${left}px`, "important");
+            popover.style.setProperty("right", "auto", "important");
+            popover.style.setProperty("bottom", "auto", "important");
+            popover.style.setProperty("transform", "none", "important");
+        }
+    }, 0);
+}
+
+/**
  * Creates a MutationObserver that watches for any element to gain one of the specified classes
  */
 export function observeClassAdded(classNames: string[], options: ObserverOptions): MutationObserver {
@@ -106,6 +208,61 @@ export function observeClassAdded(classNames: string[], options: ObserverOptions
     const selector = classNames.map((c) => `.${c}`).join(", ");
     if (document.querySelector(selector)) {
         // Defer callback so caller can assign the returned observer first
+        setTimeout(onMatch, 0);
+        return observer;
+    }
+
+    observer.observe(document.body, {
+        attributes: true,
+        attributeFilter: ["class"],
+        subtree: true,
+    });
+
+    if (timeout && onTimeout) {
+        timeoutId = setTimeout(() => {
+            observer.disconnect();
+            onTimeout();
+        }, timeout);
+    }
+
+    return observer;
+}
+
+/**
+ * Creates a MutationObserver that watches for elements matching a base selector to gain one of the specified classes.
+ * More specific than observeClassAdded - only triggers when the element matches the base selector.
+ * @param baseSelector - CSS selector the element must match (e.g., "[data-scms-image]")
+ * @param classNames - Classes to watch for (e.g., ["streamlined-editing"])
+ */
+export function observeClassAddedOnSelector(
+    baseSelector: string,
+    classNames: string[],
+    options: ObserverOptions
+): MutationObserver {
+    const { onMatch, timeout, onTimeout } = options;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+    const observer = new MutationObserver((mutations) => {
+        for (const mutation of mutations) {
+            if (mutation.type === "attributes" && mutation.attributeName === "class") {
+                const target = mutation.target as HTMLElement;
+                // Only match if element has the base selector AND gained one of the classes
+                if (target.matches(baseSelector)) {
+                    const hasClass = classNames.some((c) => target.classList.contains(c));
+                    if (hasClass) {
+                        observer.disconnect();
+                        if (timeoutId) clearTimeout(timeoutId);
+                        onMatch();
+                        return;
+                    }
+                }
+            }
+        }
+    });
+
+    // Check if any matching element already has one of the classes
+    const selector = classNames.map((c) => `${baseSelector}.${c}`).join(", ");
+    if (document.querySelector(selector)) {
         setTimeout(onMatch, 0);
         return observer;
     }
@@ -168,7 +325,8 @@ export function selectElementStep(ctx: TourContext, options: SelectElementOption
             const observer = observeClassAdded(["streamlined-selected", "streamlined-editing"], {
                 onMatch: () => {
                     ctx.untrackObserver(observer);
-                    ctx.moveNext();
+                    // Delay to let toolbar re-render with element-specific buttons
+                    setTimeout(() => ctx.moveNext(), 300);
                 },
             });
             ctx.trackObserver(observer);
