@@ -9,6 +9,7 @@ import type { TourDefinition } from "./types";
 import { welcomeTour } from "./welcome";
 import { textEditingTour } from "./text-editing";
 import { imageEditingTour } from "./image-editing";
+import { linkEditingTour } from "./link-editing";
 import { templatesTour } from "./templates";
 import { seoTour } from "./seo";
 
@@ -19,6 +20,7 @@ export const tours = {
     welcome: welcomeTour,
     "text-editing": textEditingTour,
     "image-editing": imageEditingTour,
+    "link-editing": linkEditingTour,
     templates: templatesTour,
     seo: seoTour,
 } as const;

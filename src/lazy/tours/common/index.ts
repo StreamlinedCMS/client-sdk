@@ -5,6 +5,7 @@
 import type { TourStep, TourContext, ObserverOptions } from "../types";
 import { desktopOverrides } from "./desktop";
 import { mobileOverrides } from "./mobile";
+import { queryShadowSelector } from "./shadow-dom";
 
 /**
  * Creates a MutationObserver that watches for an element matching a selector to appear
@@ -24,6 +25,44 @@ export function observeElementAppears(selector: string, options: ObserverOptions
     // Check if already exists
     if (document.querySelector(selector)) {
         // Defer callback so caller can assign the returned observer first
+        setTimeout(onMatch, 0);
+        return observer;
+    }
+
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    if (timeout && onTimeout) {
+        timeoutId = setTimeout(() => {
+            observer.disconnect();
+            onTimeout();
+        }, timeout);
+    }
+
+    return observer;
+}
+
+/**
+ * Creates a MutationObserver that watches for an element matching a selector to be removed
+ */
+export function observeElementRemoved(selector: string, options: ObserverOptions): MutationObserver {
+    const { onMatch, timeout, onTimeout } = options;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+    const observer = new MutationObserver((mutations) => {
+        for (const mutation of mutations) {
+            for (const node of Array.from(mutation.removedNodes)) {
+                if (node instanceof Element && node.matches(selector)) {
+                    observer.disconnect();
+                    if (timeoutId) clearTimeout(timeoutId);
+                    onMatch();
+                    return;
+                }
+            }
+        }
+    });
+
+    // Check if element doesn't exist (already removed)
+    if (!document.querySelector(selector)) {
         setTimeout(onMatch, 0);
         return observer;
     }
@@ -394,4 +433,13 @@ export function waitForModalStep(ctx: TourContext, options: WaitForModalOptions)
             ctx.trackObserver(observer);
         },
     };
+}
+
+/**
+ * Returns the save button element if visible, otherwise falls back to toolbar.
+ * Use this as the element selector for save steps.
+ */
+export function getSaveButtonOrToolbar(): HTMLElement | null {
+    return queryShadowSelector("scms-toolbar >>> button[data-action='save']")
+        || document.querySelector("scms-toolbar");
 }

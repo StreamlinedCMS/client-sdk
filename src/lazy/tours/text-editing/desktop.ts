@@ -3,7 +3,7 @@
  */
 
 import type { TourStep, TourContext } from "../types";
-import { observeClassAddedOnSelector } from "../common";
+import { observeClassAddedOnSelector, getSaveButtonOrToolbar } from "../common";
 
 /**
  * Step prompting user to click a text element
@@ -62,11 +62,10 @@ export function inlineEditingStepDesktop(ctx: TourContext): TourStep {
  */
 export function saveStepDesktop(): TourStep {
     return {
-        element: "scms-toolbar",
+        element: () => getSaveButtonOrToolbar(),
         popover: {
             title: "Save Your Changes",
-            description:
-                'When you\'re done editing, click "Save" in the toolbar to publish your changes.',
+            description: 'When you\'re done editing, click "Save" to publish your changes.',
             side: "top",
             align: "center",
         },

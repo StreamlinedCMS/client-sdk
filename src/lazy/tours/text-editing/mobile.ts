@@ -3,7 +3,7 @@
  */
 
 import type { TourStep, TourContext } from "../types";
-import { observeClassAddedOnSelector } from "../common";
+import { observeClassAddedOnSelector, getSaveButtonOrToolbar } from "../common";
 
 
 /**
@@ -59,7 +59,7 @@ export function tapToEditStepMobile(ctx: TourContext): TourStep {
  */
 export function saveStepMobile(): TourStep {
     return {
-        element: "scms-toolbar",
+        element: () => getSaveButtonOrToolbar(),
         popover: {
             title: "Save Your Changes",
             description: 'When you\'re done editing, tap "Save" to publish your changes.',

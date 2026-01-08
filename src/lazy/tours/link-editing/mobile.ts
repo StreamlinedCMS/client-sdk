@@ -1,37 +1,38 @@
 /**
- * Image Editing Tour - Mobile-specific steps
+ * Link Editing Tour - Mobile-specific steps
  */
 
 import type { TourStep, TourContext } from "../types";
 import {
     observeClassAddedOnSelector,
     observeAttributeAdded,
-    observeAttributeRemoved,
     observeAttributeValue,
+    observeElementAppears,
+    observeElementRemoved,
     repositionPopoverTop,
     getSaveButtonOrToolbar,
 } from "../common";
 import { queryShadowSelector } from "../common/shadow-dom";
 
 /**
- * Step prompting user to tap an image
- * Auto-advances when element enters editing mode (images go straight to editing on mobile)
+ * Step prompting user to tap a link
+ * Auto-advances when element enters editing mode
  */
-export function selectImageStepMobile(ctx: TourContext): TourStep | null {
-    const element = ctx.findVisibleElement("[data-scms-image]");
+export function selectLinkStepMobile(ctx: TourContext): TourStep | null {
+    const element = ctx.findVisibleElement("[data-scms-link]");
     if (!element) return null;
 
     return {
         element,
         popover: {
-            title: "Select an Image",
-            description: "Tap on this image to select it.",
+            title: "Select a Link",
+            description: "Tap on this link to select it.",
             side: "bottom",
             align: "center",
             showButtons: ["close"],
         },
         onHighlighted: () => {
-            const observer = observeClassAddedOnSelector("[data-scms-image]", ["streamlined-editing"], {
+            const observer = observeClassAddedOnSelector("[data-scms-link]", ["streamlined-editing"], {
                 onMatch: () => {
                     ctx.untrackObserver(observer);
                     setTimeout(() => ctx.moveNext(), 200);
@@ -86,7 +87,7 @@ export function openElementSectionStepMobile(ctx: TourContext): TourStep {
         element: () => queryShadowSelector("scms-toolbar >>> .mobile-section[data-section='element']"),
         popover: {
             title: "Element Options",
-            description: "The Element section shows actions for the selected image.",
+            description: "The Element section shows actions for the selected link.",
             side: "top",
             align: "center",
             showButtons: ["close"],
@@ -109,30 +110,21 @@ export function openElementSectionStepMobile(ctx: TourContext): TourStep {
 }
 
 /**
- * Step highlighting the Change Image button
- * Auto-advances when media manager modal appears
+ * Step highlighting the Edit Link button
+ * Auto-advances when link editor modal appears
  */
-export function changeImageStepMobile(ctx: TourContext): TourStep {
+export function editLinkStepMobile(ctx: TourContext): TourStep {
     return {
-        element: () => queryShadowSelector("scms-toolbar >>> button[data-action='change-image']"),
+        element: () => queryShadowSelector("scms-toolbar >>> button[data-action='edit-link']"),
         popover: {
-            title: "Change the Image",
-            description: 'Tap "Change Image" to open the media library.',
+            title: "Edit the Link",
+            description: 'Tap "Edit Link" to open the link editor.',
             side: "top",
             align: "center",
             showButtons: ["close"],
         },
         onHighlighted: () => {
-            const modal = document.querySelector("scms-media-manager-modal");
-            if (!modal) return;
-
-            // Auto-advance if already open
-            if (modal.hasAttribute("open")) {
-                setTimeout(() => ctx.moveNext(), 200);
-                return;
-            }
-
-            const observer = observeAttributeAdded(modal, "open", {
+            const observer = observeElementAppears("scms-link-editor-modal", {
                 onMatch: () => {
                     ctx.untrackObserver(observer);
                     setTimeout(() => ctx.moveNext(), 200);
@@ -144,14 +136,16 @@ export function changeImageStepMobile(ctx: TourContext): TourStep {
 }
 
 /**
- * Step explaining the media manager
+ * Step explaining the link editor
+ * Auto-advances when modal is closed
  */
-export function mediaManagerStepMobile(ctx: TourContext): TourStep {
+export function linkEditorStepMobile(ctx: TourContext): TourStep {
     return {
-        element: "scms-media-manager-modal",
+        element: "scms-link-editor-modal",
         popover: {
-            title: "Media Library",
-            description: 'Select an image and tap "Insert" to replace the current image.',
+            title: "Link Editor",
+            description:
+                "Edit the URL, choose whether to open in a new tab, and modify the link content. Tap \"Apply\" when done.",
             side: "top",
             align: "center",
             showButtons: ["close"],
@@ -159,10 +153,7 @@ export function mediaManagerStepMobile(ctx: TourContext): TourStep {
         onHighlighted: () => {
             repositionPopoverTop();
 
-            const modal = document.querySelector("scms-media-manager-modal");
-            if (!modal) return;
-
-            const observer = observeAttributeRemoved(modal, "open", {
+            const observer = observeElementRemoved("scms-link-editor-modal", {
                 onMatch: () => {
                     ctx.untrackObserver(observer);
                     setTimeout(() => ctx.moveNext(), 200);
@@ -174,14 +165,14 @@ export function mediaManagerStepMobile(ctx: TourContext): TourStep {
 }
 
 /**
- * Step mentioning the double-tap shortcut
+ * Step mentioning double-tap behavior
  */
-export function shortcutStepMobile(ctx: TourContext): TourStep {
+export function goToLinkTipMobile(ctx: TourContext): TourStep {
     return {
-        element: () => ctx.findVisibleElement(".streamlined-editing[data-scms-image]"),
+        element: () => ctx.findVisibleElement(".streamlined-editing[data-scms-link]"),
         popover: {
             title: "Quick Tip",
-            description: "You can double-tap any image to open the media library directly.",
+            description: "You can double-tap any link to go to its destination.",
             side: "bottom",
             align: "center",
             showButtons: ["next", "close"],
@@ -207,3 +198,4 @@ export function saveStepMobile(): TourStep {
         },
     };
 }
+

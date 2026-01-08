@@ -763,8 +763,8 @@ class EditorController {
                         this.state.lastTapKey = null;
                         this.state.lastTapTime = 0;
                     } else if (isMobile) {
-                        // Mobile: images go straight to editing, others use two-step
-                        if (elementType === "image") {
+                        // Mobile: images and links go straight to editing, others use two-step
+                        if (elementType === "image" || elementType === "link") {
                             this.editingManager.startEditing(key, element);
                         } else if (this.state.selectedKey === key && this.state.editingKey !== key) {
                             // Two-step: second tap edits

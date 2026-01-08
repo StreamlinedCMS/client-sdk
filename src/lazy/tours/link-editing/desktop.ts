@@ -1,39 +1,39 @@
 /**
- * Image Editing Tour - Desktop-specific steps
+ * Link Editing Tour - Desktop-specific steps
  */
 
 import type { TourStep, TourContext } from "../types";
 import {
     observeClassAddedOnSelector,
-    observeAttributeAdded,
-    observeAttributeRemoved,
+    observeElementAppears,
+    observeElementRemoved,
     repositionPopoverTop,
     getSaveButtonOrToolbar,
 } from "../common";
 import { queryShadowSelector } from "../common/shadow-dom";
 
 /**
- * Step prompting user to click an image
+ * Step prompting user to click a link
  * Auto-advances when element enters editing mode
  */
-export function selectImageStepDesktop(ctx: TourContext): TourStep | null {
-    const element = ctx.findVisibleElement("[data-scms-image]");
+export function selectLinkStepDesktop(ctx: TourContext): TourStep | null {
+    const element = ctx.findVisibleElement("[data-scms-link]");
     if (!element) return null;
 
     return {
         element,
         popover: {
-            title: "Select an Image",
-            description: "Click on this image to select it.",
+            title: "Select a Link",
+            description: "Click on this link to select it.",
             side: "bottom",
             align: "center",
             showButtons: ["close"],
         },
         onHighlighted: () => {
-            const observer = observeClassAddedOnSelector("[data-scms-image]", ["streamlined-editing"], {
+            const observer = observeClassAddedOnSelector("[data-scms-link]", ["streamlined-editing"], {
                 onMatch: () => {
                     ctx.untrackObserver(observer);
-                    // Delay to let toolbar re-render with image-specific buttons
+                    // Delay to let toolbar re-render with link-specific buttons
                     setTimeout(() => ctx.moveNext(), 300);
                 },
             });
@@ -43,30 +43,21 @@ export function selectImageStepDesktop(ctx: TourContext): TourStep | null {
 }
 
 /**
- * Step highlighting the Change Image button
- * Auto-advances when media manager modal appears
+ * Step highlighting the Edit Link button
+ * Auto-advances when link editor modal appears
  */
-export function changeImageStepDesktop(ctx: TourContext): TourStep {
+export function editLinkStepDesktop(ctx: TourContext): TourStep {
     return {
-        element: () => queryShadowSelector("scms-toolbar >>> button[data-action='change-image']"),
+        element: () => queryShadowSelector("scms-toolbar >>> button[data-action='edit-link']"),
         popover: {
-            title: "Change the Image",
-            description: 'Click "Change Image" to open the media library.',
+            title: "Edit the Link",
+            description: 'Click "Edit Link" to open the link editor.',
             side: "top",
             align: "center",
             showButtons: ["close"],
         },
         onHighlighted: () => {
-            const modal = document.querySelector("scms-media-manager-modal");
-            if (!modal) return;
-
-            // Auto-advance if already open
-            if (modal.hasAttribute("open")) {
-                ctx.moveNext();
-                return;
-            }
-
-            const observer = observeAttributeAdded(modal, "open", {
+            const observer = observeElementAppears("scms-link-editor-modal", {
                 onMatch: () => {
                     ctx.untrackObserver(observer);
                     ctx.moveNext();
@@ -78,15 +69,16 @@ export function changeImageStepDesktop(ctx: TourContext): TourStep {
 }
 
 /**
- * Step explaining the media manager
+ * Step explaining the link editor
  * Auto-advances when modal is closed
  */
-export function mediaManagerStepDesktop(ctx: TourContext): TourStep {
+export function linkEditorStepDesktop(ctx: TourContext): TourStep {
     return {
-        element: "scms-media-manager-modal",
+        element: "scms-link-editor-modal",
         popover: {
-            title: "Media Library",
-            description: 'Select an image and click "Insert" to replace the current image.',
+            title: "Link Editor",
+            description:
+                "Edit the URL, choose whether to open in a new tab, and modify the link content. Click \"Apply\" when done.",
             side: "top",
             align: "center",
             showButtons: ["close"],
@@ -94,10 +86,7 @@ export function mediaManagerStepDesktop(ctx: TourContext): TourStep {
         onHighlighted: () => {
             repositionPopoverTop();
 
-            const modal = document.querySelector("scms-media-manager-modal");
-            if (!modal) return;
-
-            const observer = observeAttributeRemoved(modal, "open", {
+            const observer = observeElementRemoved("scms-link-editor-modal", {
                 onMatch: () => {
                     ctx.untrackObserver(observer);
                     setTimeout(() => ctx.moveNext(), 200);
@@ -109,14 +98,14 @@ export function mediaManagerStepDesktop(ctx: TourContext): TourStep {
 }
 
 /**
- * Step mentioning the double-click shortcut
+ * Step mentioning double-click behavior
  */
-export function shortcutStepDesktop(ctx: TourContext): TourStep {
+export function goToLinkTipDesktop(ctx: TourContext): TourStep {
     return {
-        element: () => ctx.findVisibleElement(".streamlined-editing[data-scms-image]"),
+        element: () => ctx.findVisibleElement(".streamlined-editing[data-scms-link]"),
         popover: {
             title: "Quick Tip",
-            description: "You can double-click any image to open the media library directly.",
+            description: "You can double-click any link to go to its destination.",
             side: "bottom",
             align: "center",
             showButtons: ["next", "close"],
@@ -138,3 +127,4 @@ export function saveStepDesktop(): TourStep {
         },
     };
 }
+
