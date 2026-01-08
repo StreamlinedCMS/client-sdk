@@ -40,7 +40,7 @@ export interface TemplateManagerHelpers {
     stopEditing: () => void;
     updateToolbarHasChanges: () => void;
     getElementToKeyMap: () => WeakMap<HTMLElement, string>;
-    scrollToElement: (element: HTMLElement) => void;
+    scrollToElement: (element: HTMLElement, delay?: number) => void;
 }
 
 export class TemplateManager {

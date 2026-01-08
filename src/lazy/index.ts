@@ -219,6 +219,7 @@ class EditorController {
             updateToolbarHasChanges: () => this.saveManager.updateToolbarHasChanges(),
             updateToolbarTemplateContext: () => this.templateManager.updateToolbarTemplateContext(),
             getElementToKeyMap: () => this.elementToKey,
+            scrollToElement: this.scrollToElement.bind(this),
         });
 
         // Initialize modal manager
@@ -631,21 +632,26 @@ class EditorController {
 
     /**
      * Scroll an element into view, centered in the visible area below the toolbar.
+     * Uses visualViewport when available to account for mobile keyboard.
      */
-    private scrollToElement(element: HTMLElement): void {
-        // Use setTimeout to allow DOM to settle after reorder/creation
+    private scrollToElement(element: HTMLElement, delay = 50): void {
+        // Use setTimeout to allow DOM to settle after reorder/creation or keyboard to open
         setTimeout(() => {
             const toolbarHeight = this.state.toolbar?.offsetHeight ?? 60;
-            const viewportHeight = window.innerHeight;
+
+            // Use visualViewport if available (accounts for keyboard on mobile)
+            const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+            const viewportTop = window.visualViewport?.offsetTop ?? 0;
+
             const visibleHeight = viewportHeight - toolbarHeight;
 
             const rect = element.getBoundingClientRect();
-            const elementCenter = rect.top + rect.height / 2;
-            const targetCenter = visibleHeight / 2;
+            const elementCenter = rect.top + rect.height / 2 - viewportTop;
+            const targetCenter = toolbarHeight + visibleHeight / 2;
             const scrollOffset = elementCenter - targetCenter;
 
             window.scrollBy({ top: scrollOffset, behavior: "smooth" });
-        }, 50);
+        }, delay);
     }
 
     private getEditableType(key: string): EditableType {

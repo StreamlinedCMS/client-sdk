@@ -20,6 +20,7 @@ export interface EditingManagerHelpers {
     updateToolbarHasChanges: () => void;
     updateToolbarTemplateContext: () => void;
     getElementToKeyMap: () => WeakMap<HTMLElement, string>;
+    scrollToElement: (element: HTMLElement, delay?: number) => void;
 }
 
 export class EditingManager {
@@ -252,9 +253,7 @@ export class EditingManager {
 
         // On mobile, scroll the element into view after keyboard opens
         if (window.innerWidth < 640) {
-            setTimeout(() => {
-                primaryInfo.element.scrollIntoView({ block: "center", behavior: "smooth" });
-            }, 300);
+            this.helpers.scrollToElement(primaryInfo.element, 300);
         }
     }
 
