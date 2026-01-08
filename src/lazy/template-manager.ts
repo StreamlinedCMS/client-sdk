@@ -40,6 +40,7 @@ export interface TemplateManagerHelpers {
     stopEditing: () => void;
     updateToolbarHasChanges: () => void;
     getElementToKeyMap: () => WeakMap<HTMLElement, string>;
+    scrollToElement: (element: HTMLElement) => void;
 }
 
 export class TemplateManager {
@@ -254,7 +255,7 @@ export class TemplateManager {
             addBtn.addEventListener("click", (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                this.addInstance(templateId);
+                this.addInstance(templateId, false); // On-page button always appends at end
             });
 
             templateInfo.container.appendChild(addBtn);
@@ -345,8 +346,10 @@ export class TemplateManager {
             this.log.debug("No template context for add instance");
             return;
         }
-        this.addInstance(this.state.toolbar.templateId);
-        this.scrollToActiveInstance();
+        const newElement = this.addInstance(this.state.toolbar.templateId);
+        if (newElement) {
+            this.helpers.scrollToElement(newElement);
+        }
     }
 
     handleDeleteInstance(): void {
@@ -397,20 +400,7 @@ export class TemplateManager {
             `[data-scms-instance="${instanceId}"]`
         );
         if (instanceElement) {
-            // Use setTimeout to allow DOM to settle after reorder
-            setTimeout(() => {
-                // Get actual toolbar height from DOM (Toolbar extends LitElement extends HTMLElement)
-                const toolbarHeight = this.state.toolbar?.offsetHeight ?? 60;
-                const viewportHeight = window.innerHeight;
-                const visibleHeight = viewportHeight - toolbarHeight;
-
-                const rect = instanceElement.getBoundingClientRect();
-                const elementCenter = rect.top + rect.height / 2;
-                const targetCenter = visibleHeight / 2;
-                const scrollOffset = elementCenter - targetCenter;
-
-                window.scrollBy({ top: scrollOffset, behavior: "smooth" });
-            }, 50);
+            this.helpers.scrollToElement(instanceElement);
         }
     }
 
@@ -418,12 +408,15 @@ export class TemplateManager {
 
     /**
      * Add a new instance to a template
+     * @param insertAfterSelected - If true, insert after the currently selected instance (for toolbar).
+     *                              If false, always append at the end (for on-page add button).
+     * @returns The newly created instance element, or null if creation failed.
      */
-    addInstance(templateId: string): void {
+    addInstance(templateId: string, insertAfterSelected: boolean = true): HTMLElement | null {
         const templateInfo = this.state.templates.get(templateId);
         if (!templateInfo) {
             this.log.error("Template not found", { templateId });
-            return;
+            return null;
         }
 
         const { container, templateHtml, groupId } = templateInfo;
@@ -437,7 +430,7 @@ export class TemplateManager {
         const clone = tempDiv.firstElementChild as HTMLElement;
         if (!clone) {
             this.log.error("Failed to create clone from template HTML");
-            return;
+            return null;
         }
 
         clone.setAttribute("data-scms-instance", newInstanceId);
@@ -458,9 +451,9 @@ export class TemplateManager {
             clone.src = IMAGE_PLACEHOLDER_DATA_URI;
         }
 
-        // Insert after the currently selected instance, or at the end if none selected
-        const currentInstanceId = this.state.toolbar?.instanceId;
-        const currentInstanceIndex = this.state.toolbar?.instanceIndex;
+        // Insert after the currently selected instance (if requested), or at the end
+        const currentInstanceId = insertAfterSelected ? this.state.toolbar?.instanceId : undefined;
+        const currentInstanceIndex = insertAfterSelected ? this.state.toolbar?.instanceIndex : undefined;
         let insertIndex = templateInfo.instanceIds.length; // Default: append at end
 
         if (currentInstanceId && currentInstanceIndex !== null && currentInstanceIndex !== undefined) {
@@ -541,6 +534,8 @@ export class TemplateManager {
 
         // Notify toolbar that we're in a template context
         this.updateToolbarTemplateContext();
+
+        return clone;
     }
 
     /**

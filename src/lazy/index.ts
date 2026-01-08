@@ -245,6 +245,7 @@ class EditorController {
             stopEditing: () => this.editingManager.stopEditing(),
             updateToolbarHasChanges: () => this.saveManager.updateToolbarHasChanges(),
             getElementToKeyMap: () => this.elementToKey,
+            scrollToElement: this.scrollToElement.bind(this),
         });
 
         // Initialize draft manager
@@ -626,6 +627,25 @@ class EditorController {
             instanceElement.hasAttribute("data-scms-image") ||
             instanceElement.hasAttribute("data-scms-link")
         );
+    }
+
+    /**
+     * Scroll an element into view, centered in the visible area below the toolbar.
+     */
+    private scrollToElement(element: HTMLElement): void {
+        // Use setTimeout to allow DOM to settle after reorder/creation
+        setTimeout(() => {
+            const toolbarHeight = this.state.toolbar?.offsetHeight ?? 60;
+            const viewportHeight = window.innerHeight;
+            const visibleHeight = viewportHeight - toolbarHeight;
+
+            const rect = element.getBoundingClientRect();
+            const elementCenter = rect.top + rect.height / 2;
+            const targetCenter = visibleHeight / 2;
+            const scrollOffset = elementCenter - targetCenter;
+
+            window.scrollBy({ top: scrollOffset, behavior: "smooth" });
+        }, 50);
     }
 
     private getEditableType(key: string): EditableType {

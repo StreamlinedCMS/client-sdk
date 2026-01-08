@@ -126,6 +126,18 @@ export class EditingManager {
             this.state.selectedInstance.classList.remove("scms-instance-selected");
         }
 
+        // Deselect any element that's in a different instance
+        const newInstanceId = instanceElement.getAttribute("data-scms-instance");
+        const activeKey = this.state.editingKey || this.state.selectedKey;
+        if (activeKey && newInstanceId) {
+            const infos = this.state.editableElements.get(activeKey);
+            const activeInstanceId = infos?.[0]?.instanceId;
+            if (activeInstanceId && activeInstanceId !== newInstanceId) {
+                this.stopEditing();
+                this.deselectElement();
+            }
+        }
+
         this.state.selectedInstance = instanceElement;
         instanceElement.classList.add("scms-instance-selected");
 
