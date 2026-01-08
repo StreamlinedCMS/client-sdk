@@ -12,6 +12,7 @@ import { imageEditingTour } from "./image-editing";
 import { linkEditingTour } from "./link-editing";
 import { templatesTour } from "./templates";
 import { seoTour } from "./seo";
+import { modeToggleTour } from "./mode-toggle";
 
 /**
  * All available tours
@@ -23,6 +24,7 @@ export const tours = {
     "link-editing": linkEditingTour,
     templates: templatesTour,
     seo: seoTour,
+    "mode-toggle": modeToggleTour,
 } as const;
 
 export type TourId = keyof typeof tours;
