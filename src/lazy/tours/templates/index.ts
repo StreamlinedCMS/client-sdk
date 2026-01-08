@@ -3,61 +3,49 @@
  */
 
 import type { TourDefinition, TourStep, TourContext } from "../types";
-import { desktopSteps } from "./desktop";
-import { mobileSteps } from "./mobile";
+import {
+    selectInstanceStepDesktop,
+    templateDropdownStepDesktop,
+    templateActionsStepDesktop,
+} from "./desktop";
+import {
+    selectInstanceStepMobile,
+    expandToolbarStepMobile,
+    openTemplateSectionStepMobile,
+    templateActionsStepMobile,
+} from "./mobile";
+
+/**
+ * Step shown when no template elements exist on the page
+ */
+function noTemplatesStep(): TourStep {
+    return {
+        popover: {
+            title: "No Repeating Content",
+            description:
+                "This page doesn't have any repeating content sections. Try this tour on a page with lists or repeating items.",
+            side: "top",
+            align: "center",
+            showButtons: ["next", "close"],
+        },
+    };
+}
 
 /**
  * Step introducing template containers
  */
-function templateContainerStep(ctx: TourContext): TourStep | null {
+function templateContainerStep(ctx: TourContext): TourStep {
     const element = ctx.findVisibleElement("[data-scms-template]");
-    if (!element) return null;
 
     return {
-        element,
+        element: element ?? undefined,
         popover: {
-            title: "Repeating Templates",
+            title: "Repeating Content",
             description:
                 "This section contains repeating items. You can add, remove, and reorder them.",
             side: "top",
             align: "start",
-        },
-    };
-}
-
-/**
- * Step about template instances
- */
-function templateInstanceStep(ctx: TourContext): TourStep | null {
-    const element = ctx.findVisibleElement("[data-scms-instance]");
-    if (!element) return null;
-
-    return {
-        element,
-        popover: {
-            title: "Template Items",
-            description: ctx.isMobile
-                ? "Each item can be edited independently. Tap to select, then use the toolbar to manage."
-                : "Each item can be edited independently. Click to select, then use the Template dropdown to manage.",
-            side: "bottom",
-            align: "center",
-        },
-    };
-}
-
-/**
- * Step about template controls in toolbar
- */
-function templateControlsStep(ctx: TourContext): TourStep {
-    return {
-        element: "scms-toolbar",
-        popover: {
-            title: "Template Controls",
-            description: ctx.isMobile
-                ? "With a template item selected, expand the toolbar to access the Template Item section where you can add, delete, or reorder."
-                : "With a template item selected, use the Template dropdown to add new items, delete, or reorder.",
-            side: "top",
-            align: "center",
+            showButtons: ["next", "close"],
         },
     };
 }
@@ -68,13 +56,27 @@ export const templatesTour: TourDefinition = {
     description: "Add, remove, and reorder items",
 
     getSteps: (ctx: TourContext) => {
-        const platformSteps = ctx.isMobile ? mobileSteps(ctx) : desktopSteps(ctx);
+        // Check if page has template elements
+        const templateElement = ctx.findVisibleElement("[data-scms-template]");
+        if (!templateElement) {
+            return [noTemplatesStep()];
+        }
+
+        if (ctx.isMobile) {
+            return [
+                templateContainerStep(ctx),
+                selectInstanceStepMobile(ctx),
+                expandToolbarStepMobile(ctx),
+                openTemplateSectionStepMobile(ctx),
+                templateActionsStepMobile(ctx),
+            ];
+        }
 
         return [
             templateContainerStep(ctx),
-            templateInstanceStep(ctx),
-            ...platformSteps,
-            templateControlsStep(ctx),
+            selectInstanceStepDesktop(ctx),
+            templateDropdownStepDesktop(ctx),
+            templateActionsStepDesktop(ctx),
         ];
     },
 };

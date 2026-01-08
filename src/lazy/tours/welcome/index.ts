@@ -2,67 +2,22 @@
  * Welcome Tour - First-time onboarding tour
  */
 
-import type { TourDefinition, TourStep, TourContext } from "../types";
-import { toolbarStep } from "../common";
-import { desktopSteps } from "./desktop";
-import { mobileSteps } from "./mobile";
+import type { TourDefinition, TourStep } from "../types";
 
 /**
- * Step for editable text elements
+ * Welcome introduction step (centered, no element)
  */
-function textElementStep(ctx: TourContext): TourStep | null {
-    const element = ctx.findVisibleElement("[data-scms-text]");
-    if (!element) return null;
-
+function welcomeStep(): TourStep {
     return {
-        element,
         popover: {
-            title: "Editable Content",
-            description: ctx.isMobile
-                ? "Elements with a blue outline are editable. Tap to start editing."
-                : "Elements with a blue outline are editable. Click on them to start editing.",
-            side: "bottom",
-            align: "start",
-        },
-    };
-}
-
-/**
- * Step for editable image elements
- */
-function imageElementStep(ctx: TourContext): TourStep | null {
-    const element = ctx.findVisibleElement("[data-scms-image]");
-    if (!element) return null;
-
-    return {
-        element,
-        popover: {
-            title: "Editable Images",
-            description: ctx.isMobile
-                ? "Tap an image to select it, then use the toolbar to change it. Double-tap to open the media library."
-                : "Click an image to select it, then use the toolbar to change it. Double-click to open the media library.",
-            side: "bottom",
+            title: "Welcome to Streamlined CMS",
+            description:
+                "You can edit text, images, and links directly on this page. " +
+                "Select any editable element to see available actions in the toolbar.<br><br>" +
+                "Use the <strong>Help</strong> button in the toolbar to access guided tours for specific tasks.",
+            side: "top",
             align: "center",
-        },
-    };
-}
-
-/**
- * Step for editable link elements
- */
-function linkElementStep(ctx: TourContext): TourStep | null {
-    const element = ctx.findVisibleElement("[data-scms-link]");
-    if (!element) return null;
-
-    return {
-        element,
-        popover: {
-            title: "Editable Links",
-            description: ctx.isMobile
-                ? "Tap a link to select it, then use 'Edit Link' in the toolbar to change the URL or text."
-                : "Click a link to select it, then use 'Edit Link' in the toolbar to change the URL or text.",
-            side: "bottom",
-            align: "start",
+            showButtons: ["next", "close"],
         },
     };
 }
@@ -70,22 +25,7 @@ function linkElementStep(ctx: TourContext): TourStep | null {
 export const welcomeTour: TourDefinition = {
     id: "welcome",
     label: "How do I get started?",
-    description: "Learn the basics of editing",
+    description: "Quick introduction to the editor",
 
-    getSteps: (ctx: TourContext) => {
-        const platformSteps = ctx.isMobile ? mobileSteps(ctx) : desktopSteps(ctx);
-
-        return [
-            // Show available editable elements
-            textElementStep(ctx),
-            imageElementStep(ctx),
-            linkElementStep(ctx),
-
-            // Platform-specific steps
-            ...platformSteps,
-
-            // The toolbar
-            toolbarStep(ctx),
-        ];
-    },
+    getSteps: () => [welcomeStep()],
 };
