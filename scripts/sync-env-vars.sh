@@ -129,6 +129,7 @@ if [ "$ENVIRONMENT" = "staging" ]; then
     fi
 
     VARS_TO_SYNC=(
+        "CLOUDFLARE_ACCOUNT_ID"
         "SDK_API_URL"
         "SDK_APP_URL"
         "R2_BUCKET_STAGING"
@@ -139,6 +140,7 @@ else
     load_env_file "$PROJECT_DIR/.env"
 
     VARS_TO_SYNC=(
+        "CLOUDFLARE_ACCOUNT_ID"
         "SDK_API_URL"
         "SDK_APP_URL"
         "R2_BUCKET_PRODUCTION"

@@ -59,9 +59,11 @@ jobs:
             - name: Upload to CDN
               run: node scripts/cdn-upload.js production --ci
               env:
+                  CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
                   CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
             - name: Publish version
               run: node scripts/cdn-publish.js production --ci
               env:
+                  CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
                   CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
