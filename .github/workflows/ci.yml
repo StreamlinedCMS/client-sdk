@@ -80,3 +80,4 @@ jobs:
         with:
             labels: ${{ toJson(github.event.pull_request.labels.*.name) }}
             require: ${{ github.base_ref == 'master' }}
+            head_ref: ${{ github.head_ref }}

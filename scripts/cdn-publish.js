@@ -3,10 +3,14 @@
 /**
  * Update KV version aliases for the CDN.
  *
- * Sets the following aliases for the current package version:
+ * For stable versions (e.g., 1.2.3):
  *   - "latest" -> current version
- *   - "<major>" -> current version (e.g., "0")
- *   - "<major>.<minor>" -> current version (e.g., "0.1")
+ *   - "<major>" -> current version (e.g., "1")
+ *   - "<major>.<minor>" -> current version (e.g., "1.2")
+ *
+ * For prerelease versions (e.g., 1.0.0-beta.0):
+ *   - "<type>" -> current version (e.g., "beta")
+ *   - "<base>-<type>" -> current version (e.g., "1.0.0-beta")
  *
  * Usage: node scripts/cdn-publish.js <staging|production> [options]
  */
@@ -33,12 +37,15 @@ const versionOverride = versionArg ? versionArg.split("=")[1] : null;
 
 // --ci implies --yes (used in CI pipelines)
 const skipPrompts = flags.has("--yes") || flags.has("--ci");
+// --no-alias skips alias updates (for release branch testing)
+const noAlias = flags.has("--no-alias");
 
 if (!["staging", "production"].includes(environment)) {
     console.error("Usage: node scripts/cdn-publish.js <staging|production> [options]");
     console.error("  --yes            Skip confirmation prompts");
     console.error("  --ci             Same as --yes (for CI pipelines)");
     console.error("  --version=X.Y.Z  Override version (e.g., 0.1.22-dev.20260110143052)");
+    console.error("  --no-alias       Only publish exact version, skip alias updates");
     process.exit(1);
 }
 
@@ -54,8 +61,13 @@ if (!namespaceId) {
 }
 
 const version = versionOverride || packageJson.version;
-// Extract major.minor from base version (before any prerelease suffix)
-const baseVersion = version.split("-")[0];
+
+// Parse version to detect prerelease
+// Examples: "1.2.3" (stable), "1.0.0-beta.0" (prerelease), "1.0.0-rc.1" (prerelease)
+const prereleaseMatch = version.match(/^(\d+\.\d+\.\d+)-([a-z]+)\.(\d+)$/i);
+const isPrerelease = prereleaseMatch !== null;
+const baseVersion = prereleaseMatch ? prereleaseMatch[1] : version.split("-")[0];
+const prereleaseType = prereleaseMatch ? prereleaseMatch[2] : null; // "beta", "rc", "alpha"
 const [major, minor] = baseVersion.split(".");
 
 // Asset collection name for KV key prefixing
@@ -63,26 +75,45 @@ const collection = "client-sdk";
 
 // KV entries to write:
 // - Exact version marker ("_") to mark version as published
-// - Aliases pointing to the version
+// - Aliases pointing to the version (unless --no-alias)
 const VERSION_MARKER = "_";
-const kvEntries = [
-    [version, VERSION_MARKER], // Exact version marker
-    ["latest", version],
-    [major, version],
-    [`${major}.${minor}`, version],
-];
+const kvEntries = [[version, VERSION_MARKER]]; // Always include version marker
 
-console.log(`Publishing SDK v${version} to ${environment}:\n`);
+if (!noAlias) {
+    if (isPrerelease) {
+        // Prerelease aliases: "beta" and "1.0.0-beta"
+        kvEntries.push(
+            [prereleaseType, version], // e.g., "beta" -> "1.0.0-beta.0"
+            [`${baseVersion}-${prereleaseType}`, version], // e.g., "1.0.0-beta" -> "1.0.0-beta.0"
+        );
+    } else {
+        // Stable aliases: "latest", "1", "1.2"
+        kvEntries.push(["latest", version], [major, version], [`${major}.${minor}`, version]);
+    }
+}
+
+const versionType = isPrerelease ? `prerelease (${prereleaseType})` : "stable";
+console.log(`Publishing SDK v${version} to ${environment} [${versionType}]:\n`);
 
 console.log(`  Version marker:`);
 console.log(`    "${collection}/${version}" -> "${VERSION_MARKER}" (marks version as published)\n`);
 
-console.log(`  Aliases:`);
-const aliases = kvEntries.slice(1);
-const maxKeyLen = Math.max(...aliases.map(([alias]) => `${collection}/${alias}`.length));
-for (const [alias, targetVersion] of aliases) {
-    const key = `${collection}/${alias}`;
-    console.log(`    "${key}"${" ".repeat(maxKeyLen - key.length)} -> "${targetVersion}"`);
+if (noAlias) {
+    console.log(`  Aliases: (skipped due to --no-alias)\n`);
+} else {
+    const aliasType = isPrerelease ? "Prerelease aliases" : "Stable aliases";
+    console.log(`  ${aliasType}:`);
+    const aliases = kvEntries.slice(1);
+    const maxKeyLen = Math.max(...aliases.map(([alias]) => `${collection}/${alias}`.length));
+    for (const [alias, targetVersion] of aliases) {
+        const key = `${collection}/${alias}`;
+        console.log(`    "${key}"${" ".repeat(maxKeyLen - key.length)} -> "${targetVersion}"`);
+    }
+    if (isPrerelease) {
+        console.log(
+            `\n  Note: Stable aliases (latest, ${major}, ${major}.${minor}) are NOT updated.`,
+        );
+    }
 }
 
 if (!skipPrompts) {
@@ -115,8 +146,24 @@ for (const [key, value] of kvEntries) {
 const cdnDomain =
     environment === "staging" ? "cdn.staging.streamlinedcms.com" : "cdn.streamlinedcms.com";
 
-console.log(`\nPublish complete. SDK v${version} is now live.`);
-console.log(`\nTest URLs:`);
-console.log(`  https://${cdnDomain}/${collection}/v${version}/streamlined-cms.min.js`);
-console.log(`  https://${cdnDomain}/${collection}/v${major}.${minor}/streamlined-cms.min.js`);
-console.log(`  https://${cdnDomain}/${collection}/versions.json`);
+if (noAlias) {
+    console.log(`\nPublish complete. SDK v${version} is available (no aliases updated).`);
+    console.log(`\nTest URL:`);
+    console.log(`  https://${cdnDomain}/${collection}/v${version}/streamlined-cms.min.js`);
+} else if (isPrerelease) {
+    console.log(
+        `\nPublish complete. SDK v${version} is now available for ${prereleaseType} testing.`,
+    );
+    console.log(`\nTest URLs:`);
+    console.log(`  https://${cdnDomain}/${collection}/v${version}/streamlined-cms.min.js`);
+    console.log(`  https://${cdnDomain}/${collection}/${prereleaseType}/streamlined-cms.min.js`);
+    console.log(
+        `  https://${cdnDomain}/${collection}/${baseVersion}-${prereleaseType}/streamlined-cms.min.js`,
+    );
+} else {
+    console.log(`\nPublish complete. SDK v${version} is now live.`);
+    console.log(`\nTest URLs:`);
+    console.log(`  https://${cdnDomain}/${collection}/v${version}/streamlined-cms.min.js`);
+    console.log(`  https://${cdnDomain}/${collection}/v${major}.${minor}/streamlined-cms.min.js`);
+    console.log(`  https://${cdnDomain}/${collection}/versions.json`);
+}
