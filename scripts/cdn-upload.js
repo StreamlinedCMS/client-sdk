@@ -28,11 +28,13 @@ const versionOverride = versionArg ? versionArg.split("=")[1] : null;
 
 // --ci implies --yes (used in CI pipelines)
 const skipPrompts = flags.has("--yes") || flags.has("--ci");
+const skipBuild = flags.has("--skip-build");
 
 if (!["staging", "production"].includes(environment)) {
     console.error("Usage: node scripts/cdn-upload.js <staging|production> [options]");
     console.error("  --yes            Skip confirmation prompts");
     console.error("  --ci             Same as --yes (for CI pipelines)");
+    console.error("  --skip-build     Skip npm run build (use pre-built dist/)");
     console.error("  --version=X.Y.Z  Override version (e.g., 0.1.22-dev.20260110143052)");
     process.exit(1);
 }
@@ -60,9 +62,13 @@ const files = [
     "streamlined-cms.esm.min.js.map",
 ];
 
-// Build first
-console.log("Building SDK...\n");
-execSync("npm run build", { stdio: "inherit", cwd: join(__dirname, "..") });
+// Build first (unless --skip-build)
+if (skipBuild) {
+    console.log("Skipping build (--skip-build)\n");
+} else {
+    console.log("Building SDK...\n");
+    execSync("npm run build", { stdio: "inherit", cwd: join(__dirname, "..") });
+}
 
 // Check if version already exists in R2
 const checkPath = `${bucketName}/${collection}/${version}/${files[0]}`;
