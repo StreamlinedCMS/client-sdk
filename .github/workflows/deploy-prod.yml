@@ -113,24 +113,31 @@ jobs:
                   fetch-depth: 0
                   token: ${{ secrets.GITHUB_TOKEN }}
 
-            - name: Sync release branch to develop
+            - name: Sync master to develop
               env:
                   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-                  HEAD_REF: ${{ github.event.pull_request.head.ref }}
               run: |
                   git config user.name "github-actions[bot]"
                   git config user.email "github-actions[bot]@users.noreply.github.com"
 
+                  git fetch origin master develop
                   git checkout develop
-                  git pull origin develop
 
-                  if git merge "origin/$HEAD_REF" --no-edit; then
+                  if git merge origin/master --no-edit; then
                       echo "Merge successful, pushing to develop"
                       git push
                   else
                       echo "Merge conflict detected, creating PR for manual resolution"
                       git merge --abort
-                      gh pr create --base develop --head "$HEAD_REF" \
-                          --title "Sync $HEAD_REF to develop" \
+                      gh pr create --base develop --head master \
+                          --title "Sync master to develop" \
                           --body "Auto-generated PR to sync release changes back to develop. Manual conflict resolution required."
                   fi
+
+            - name: Delete release branch
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  HEAD_REF: ${{ github.event.pull_request.head.ref }}
+              run: |
+                  echo "Deleting branch: $HEAD_REF"
+                  git push origin --delete "$HEAD_REF"
