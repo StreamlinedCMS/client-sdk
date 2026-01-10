@@ -3,7 +3,7 @@
 /**
  * Upload SDK build artifacts to R2 bucket for CDN distribution.
  *
- * Usage: node scripts/cdn-upload.js <staging|production>
+ * Usage: node scripts/cdn-upload.js <staging|production> [options]
  */
 
 import { execSync } from "child_process";
@@ -18,10 +18,24 @@ dotenv.config({ path: join(__dirname, "..", ".env") });
 
 const packageJson = JSON.parse(readFileSync(join(__dirname, "..", "package.json"), "utf-8"));
 
-const environment = process.argv[2];
+const args = process.argv.slice(2);
+const environment = args.find((arg) => !arg.startsWith("--"));
+const flags = new Set(args.filter((arg) => arg.startsWith("--") && !arg.includes("=")));
+
+// Parse --version=X.Y.Z option
+const versionArg = args.find((arg) => arg.startsWith("--version="));
+const versionOverride = versionArg ? versionArg.split("=")[1] : null;
+
+// --ci implies --yes (used in CI pipelines)
+const skipPrompts = flags.has("--yes") || flags.has("--ci");
+const skipBuild = flags.has("--skip-build");
 
 if (!["staging", "production"].includes(environment)) {
-    console.error("Usage: node scripts/cdn-upload.js <staging|production>");
+    console.error("Usage: node scripts/cdn-upload.js <staging|production> [options]");
+    console.error("  --yes            Skip confirmation prompts");
+    console.error("  --ci             Same as --yes (for CI pipelines)");
+    console.error("  --skip-build     Skip npm run build (use pre-built dist/)");
+    console.error("  --version=X.Y.Z  Override version (e.g., 0.1.22-dev.20260110143052)");
     process.exit(1);
 }
 
@@ -34,7 +48,7 @@ if (!bucketName) {
     process.exit(1);
 }
 
-const version = packageJson.version;
+const version = versionOverride || packageJson.version;
 const collection = "client-sdk";
 
 const files = [
@@ -48,15 +62,19 @@ const files = [
     "streamlined-cms.esm.min.js.map",
 ];
 
-// Build first
-console.log("Building SDK...\n");
-execSync("npm run build", { stdio: "inherit", cwd: join(__dirname, "..") });
+// Build first (unless --skip-build)
+if (skipBuild) {
+    console.log("Skipping build (--skip-build)\n");
+} else {
+    console.log("Building SDK...\n");
+    execSync("npm run build", { stdio: "inherit", cwd: join(__dirname, "..") });
+}
 
 // Check if version already exists in R2
 const checkPath = `${bucketName}/${collection}/${version}/${files[0]}`;
 let versionExists = false;
 try {
-    execSync(`wrangler r2 object get "${checkPath}" --remote --pipe > /dev/null 2>&1`, {
+    execSync(`npx wrangler r2 object get "${checkPath}" --remote --pipe > /dev/null 2>&1`, {
         stdio: "pipe",
     });
     versionExists = true;
@@ -71,17 +89,23 @@ for (const file of files) {
 }
 
 if (versionExists) {
+    if (skipPrompts) {
+        console.error(`\n❌ Version ${version} already exists. Bump the version before deploying.`);
+        process.exit(1);
+    }
     console.log(`\n⚠️  Version ${version} already exists and will be overwritten.`);
 }
 
-const rl = createInterface({ input: process.stdin, output: process.stdout });
-const answer = await new Promise((resolve) => {
-    rl.question(`\nProceed? (yes/N): `, resolve);
-});
-rl.close();
-if (answer.toLowerCase() !== "yes") {
-    console.log("Aborted.");
-    process.exit(0);
+if (!skipPrompts) {
+    const rl = createInterface({ input: process.stdin, output: process.stdout });
+    const answer = await new Promise((resolve) => {
+        rl.question(`\nProceed? (yes/N): `, resolve);
+    });
+    rl.close();
+    if (answer.toLowerCase() !== "yes") {
+        console.log("Aborted.");
+        process.exit(0);
+    }
 }
 
 console.log();
@@ -91,7 +115,7 @@ for (const file of files) {
     const r2Path = `${bucketName}/${collection}/${version}/${file}`;
 
     try {
-        execSync(`wrangler r2 object put "${r2Path}" --remote --file "${localPath}"`, {
+        execSync(`npx wrangler r2 object put "${r2Path}" --remote --file "${localPath}"`, {
             stdio: "inherit",
         });
     } catch (error) {
