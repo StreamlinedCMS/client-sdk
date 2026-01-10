@@ -241,7 +241,7 @@ master_payload=$(cat <<'EOF'
                     { "context": "lint" },
                     { "context": "build" },
                     { "context": "test" },
-                    { "context": "check-release-label" }
+                    { "context": "check-release-label / check" }
                 ]
             }
         }
