@@ -101,3 +101,36 @@ jobs:
               env:
                   CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
                   CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
+    sync-develop:
+        needs: deploy
+        if: startsWith(github.event.pull_request.head.ref, 'release/')
+        runs-on: ubuntu-latest
+
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+                  token: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Sync release branch to develop
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  HEAD_REF: ${{ github.event.pull_request.head.ref }}
+              run: |
+                  git config user.name "github-actions[bot]"
+                  git config user.email "github-actions[bot]@users.noreply.github.com"
+
+                  git checkout develop
+                  git pull origin develop
+
+                  if git merge "origin/$HEAD_REF" --no-edit; then
+                      echo "Merge successful, pushing to develop"
+                      git push
+                  else
+                      echo "Merge conflict detected, creating PR for manual resolution"
+                      git merge --abort
+                      gh pr create --base develop --head "$HEAD_REF" \
+                          --title "Sync $HEAD_REF to develop" \
+                          --body "Auto-generated PR to sync release changes back to develop. Manual conflict resolution required."
+                  fi
